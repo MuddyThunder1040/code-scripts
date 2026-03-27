@@ -41,7 +41,7 @@ pipeline {
 
                     if (failures) {
                         error("The following required tools are missing or failed: ${failures.join(', ')}")
-                        failures > ${WORKSPACE}/tmp/list.txt
+                        writeFile file: "${env.WORKSPACE}/list.txt", text: failures.join(', ')
                     } else {
                         echo 'All required tools are installed and accessible.'
                     }
