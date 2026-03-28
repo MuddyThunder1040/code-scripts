@@ -1,0 +1,179 @@
+pipeline {
+    agent { label 'DELL' }
+
+    options {
+        timestamps()
+    }
+
+    parameters {
+        string(
+            name: 'FAILED_TOOLS',
+            defaultValue: '',
+            description: 'Comma-separated failed tools from SoftwareCheck. Example: Docker, Terraform, AWS CLI'
+        )
+    }
+
+    stages {
+        stage('Validate Input') {
+            steps {
+                script {
+                    def rawFailedTools = params.FAILED_TOOLS?.trim()
+
+                    if (!rawFailedTools) {
+                        error('FAILED_TOOLS is empty. Pass the failed list from SoftwareCheck, for example: Git, Docker')
+                    }
+
+                    def failedTools = rawFailedTools
+                        .split(',')
+                        .collect { it.trim() }
+                        .findAll { it }
+                        .unique()
+
+                    if (!failedTools) {
+                        error('No valid tool names were found in FAILED_TOOLS.')
+                    }
+
+                    env.NORMALIZED_FAILED_TOOLS = failedTools.join(',')
+                    echo "Tools requested for installation: ${env.NORMALIZED_FAILED_TOOLS}"
+                }
+            }
+        }
+
+        stage('Install Missing Tools') {
+            steps {
+                script {
+                    def installerMap = [
+                        'Git'       : [apt: 'git',         dnf: 'git',             yum: 'git',             brew: 'git'],
+                        'Java (JDK)': [apt: 'default-jdk', dnf: 'java-17-openjdk', yum: 'java-17-openjdk', brew: 'openjdk'],
+                        'Docker'    : [apt: 'docker.io',   dnf: 'docker',          yum: 'docker',          brew: 'docker'],
+                        'Terraform' : [apt: 'terraform',   dnf: 'terraform',       yum: 'terraform',       brew: 'terraform'],
+                        'AWS CLI'   : [apt: 'awscli',      dnf: 'awscli',          yum: 'awscli',          brew: 'awscli'],
+                        'Python'    : [apt: 'python3',     dnf: 'python3',         yum: 'python3',         brew: 'python'],
+                        'rsync'     : [apt: 'rsync',       dnf: 'rsync',           yum: 'rsync',           brew: 'rsync'],
+                        'curl'      : [apt: 'curl',        dnf: 'curl',            yum: 'curl',            brew: 'curl'],
+                    ]
+
+                    def failedTools = env.NORMALIZED_FAILED_TOOLS
+                        .split(',')
+                        .collect { it.trim() }
+                        .findAll { it }
+
+                    def unsupportedTools = []
+
+                    failedTools.each { tool ->
+                        if (!installerMap.containsKey(tool)) {
+                            echo "[SKIP] ${tool}: No installer mapping is defined."
+                            unsupportedTools << tool
+                            return
+                        }
+
+                        def packages = installerMap[tool]
+                        echo "[INFO] Installing ${tool}"
+
+                        sh """
+                            set -eux
+
+                            detect_pkg_manager() {
+                                if command -v apt-get >/dev/null 2>&1; then
+                                    echo apt
+                                elif command -v dnf >/dev/null 2>&1; then
+                                    echo dnf
+                                elif command -v yum >/dev/null 2>&1; then
+                                    echo yum
+                                elif command -v brew >/dev/null 2>&1; then
+                                    echo brew
+                                else
+                                    echo unsupported
+                                fi
+                            }
+
+                            PKG_MANAGER="\$(detect_pkg_manager)"
+
+                            if [ "\$PKG_MANAGER" = "unsupported" ]; then
+                                echo "No supported package manager found on this agent."
+                                exit 1
+                            fi
+
+                            if command -v sudo >/dev/null 2>&1; then
+                                SUDO="sudo"
+                            else
+                                SUDO=""
+                            fi
+
+                            case "\$PKG_MANAGER" in
+                                apt)
+                                    \$SUDO apt-get update
+                                    \$SUDO apt-get install -y ${packages.apt}
+                                    ;;
+                                dnf)
+                                    \$SUDO dnf install -y ${packages.dnf}
+                                    ;;
+                                yum)
+                                    \$SUDO yum install -y ${packages.yum}
+                                    ;;
+                                brew)
+                                    brew install ${packages.brew}
+                                    ;;
+                            esac
+                        """
+                    }
+
+                    if (unsupportedTools) {
+                        echo "Unsupported tool names: ${unsupportedTools.join(', ')}"
+                    }
+                }
+            }
+        }
+
+        stage('Verify Installation') {
+            steps {
+                script {
+                    def verificationMap = [
+                        'Git'       : 'git --version',
+                        'Java (JDK)': 'java -version',
+                        'Docker'    : 'docker --version',
+                        'Terraform' : 'terraform --version',
+                        'AWS CLI'   : 'aws --version',
+                        'Python'    : 'python3 --version',
+                        'rsync'     : 'rsync --version',
+                        'curl'      : 'curl --version',
+                    ]
+
+                    def failures = []
+                    def failedTools = env.NORMALIZED_FAILED_TOOLS
+                        .split(',')
+                        .collect { it.trim() }
+                        .findAll { it }
+
+                    failedTools.each { tool ->
+                        if (!verificationMap.containsKey(tool)) {
+                            return
+                        }
+
+                        try {
+                            def output = sh(script: "${verificationMap[tool]} 2>&1", returnStdout: true).trim()
+                            def firstLine = output.readLines().first()
+                            echo "[PASS] ${tool}: ${firstLine}"
+                        } catch (Exception e) {
+                            echo "[FAIL] ${tool}: Installation verification failed"
+                            failures << tool
+                        }
+                    }
+
+                    if (failures) {
+                        error("Some tools are still unavailable after installation: ${failures.join(', ')}")
+                    }
+                }
+            }
+        }
+    }
+
+    post {
+        success {
+            echo 'Requested software installation completed successfully.'
+        }
+        failure {
+            echo 'Software installation failed. Check package manager access, sudo permissions, and package repository availability.'
+        }
+    }
+}

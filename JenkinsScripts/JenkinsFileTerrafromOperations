@@ -1,0 +1,64 @@
+pipeline {
+    agent { label 'DELL' }
+
+    options {
+        timestamps()
+    }
+
+    parameters {
+        choice(
+            name: 'Module',
+            choices: ['Local', 'Instance', 'S3'],
+            description: 'Select the Terraform module to use'
+        )
+        string(
+            name: 'Branch',
+            defaultValue: 'main',
+            description: 'Select the Git branch to use'
+        )
+        choice(
+            name: 'Action',
+            choices: ['plan', 'apply', 'show', 'destroy', 'validate'],
+            description: 'Select the Terraform action to perform'
+        )
+    }
+
+    stages {
+        stage('Checkout Code') {
+            steps {
+                git branch: "${params.Branch}", url: 'https://github.com/MuddyThunder1040/code-scripts.git'
+            }
+        }
+
+        stage('Terraform Operation') {
+            steps {
+                sh "cd ${params.Module} && terraform init"
+                sh "cd ${params.Module} && terraform ${params.Action}" + (params.Action == 'apply' ? ' -auto-approve' : '')
+            }
+        }
+    }
+
+    post {
+        always {
+            echo 'Cleaning up workspace...'
+            cleanWs()
+        }
+        success {
+            echo "Terraform ${params.Action} completed successfully for ${params.Module} module on ${params.Branch} branch."
+            script {
+                if (params.Action == 'apply') {
+                    slackSend message: "Terraform ${params.Action} completed successfully for ${params.Module} module on ${params.Branch} branch.", color: 'good'
+                }
+            }
+        }
+
+        failure {
+            echo "Terraform ${params.Action} failed for ${params.Module} module on ${params.Branch} branch."
+            script {
+                if (params.Action == 'apply') {
+                    slackSend message: "Terraform ${params.Action} failed for ${params.Module} module on ${params.Branch} branch.", color: 'danger'
+                }
+            }
+        }
+    }
+}

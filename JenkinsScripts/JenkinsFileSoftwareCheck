@@ -1,0 +1,62 @@
+pipeline {
+    agent { label 'DELL' }
+
+    options {
+        timestamps()
+    }
+
+    stages {
+        stage('Environment Validation') {
+            steps {
+                script {
+                    def tools = [
+                        [name: 'Git',       cmd: 'git --version'],
+                        [name: 'Java (JDK)', cmd: 'java -version'],
+                        [name: 'Docker',    cmd: 'docker --version'],
+                        [name: 'Terraform', cmd: 'terraform --version'],
+                        [name: 'AWS CLI',   cmd: 'aws --version'],
+                        [name: 'Python',    cmd: 'python3 --version'],
+                        [name: 'rsync',     cmd: 'rsync --version'],
+                        [name: 'curl',      cmd: 'curl --version'],
+                    ]
+
+                    def failures = []
+
+                    echo '============================================================'
+                    echo '          TOOL VALIDATION SUMMARY'
+                    echo '============================================================'
+
+                    tools.each { tool ->
+                        try {
+                            def output = sh(script: "${tool.cmd} 2>&1", returnStdout: true).trim()
+                            def firstLine = output.readLines().first()
+                            echo "[PASS] ${tool.name}: ${firstLine}"
+                        } catch (Exception e) {
+                            echo "[FAIL] ${tool.name}: NOT FOUND or ERROR"
+                            failures << tool.name
+                        }
+                    }
+
+                    echo '============================================================'
+
+                    if (failures) {
+                        sh 'mkdir -p tmp'
+                        writeFile file: "${env.WORKSPACE}/tmp/list.txt", text: failures.join(', ')
+                        error("The following required tools are missing or failed: ${failures.join(', ')}")
+                    } else {
+                        echo 'All required tools are installed and accessible.'
+                    }
+                }
+            }
+        }
+    }
+
+    post {
+        success {
+            echo 'Environment validation passed. Agent is ready.'
+        }
+        failure {
+            echo 'Environment validation FAILED. Please install the missing tools on this agent.'
+        }
+    }
+}
