@@ -33,7 +33,7 @@ pipeline {
         stage('Terraform Operation') {
             steps {
                 sh "cd ${params.Module} && terraform init"
-                sh "cd ${params.Module} && terraform ${params.Action}"
+                sh "cd ${params.Module} && terraform ${params.Action}" + (params.Action == 'apply' ? ' -auto-approve' : '')
             }
         }
     }
