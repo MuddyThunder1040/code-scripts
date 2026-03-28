@@ -40,8 +40,9 @@ pipeline {
                     echo '============================================================'
 
                     if (failures) {
+                        sh 'mkdir -p tmp'
+                        writeFile file: "${env.WORKSPACE}/tmp/list.txt", text: failures.join(', ')
                         error("The following required tools are missing or failed: ${failures.join(', ')}")
-                        writeFile file: "${env.WORKSPACE}/list.txt", text: failures.join(', ')
                     } else {
                         echo 'All required tools are installed and accessible.'
                     }
