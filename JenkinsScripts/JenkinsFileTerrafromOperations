@@ -1,47 +1,55 @@
-pipeline
-{
-    agent Dell-Server
-        options
-        {
-            timestamps()
-        }
-        parameters
-        {
-            choice(name: 'Module', choices: ['Local', 'Instance', 'S3'], description: 'Select the Terraform module to apply')
-            String(name: 'Branch', defaultValue: 'main', description: 'Select the Git branch to use')
-            choice(name: 'Action', choices: ['plan', 'apply', 'show', 'destroy', 'validate'], description: 'Select the Terraform action to perform')
-        }
-    stages
-    {        stage('Checkout Code')
-        {            
-            steps{git branch: "${Branch}", url: 'https://github.com/MuddyThunder1040/code-scripts.git'}
-        }
-        Stage('Terrafrom Operation')
-        {
-            steps{
-                sh "cd ${Module} && terraform init"
-                sh "cd ${Module} && terraform ${Action}"
+pipeline {
+    agent { label 'Dell-Server' }
+
+    options {
+        timestamps()
+    }
+
+    parameters {
+        choice(
+            name: 'Module',
+            choices: ['Local', 'Instance', 'S3'],
+            description: 'Select the Terraform module to use'
+        )
+        string(
+            name: 'Branch',
+            defaultValue: 'main',
+            description: 'Select the Git branch to use'
+        )
+        choice(
+            name: 'Action',
+            choices: ['plan', 'apply', 'show', 'destroy', 'validate'],
+            description: 'Select the Terraform action to perform'
+        )
+    }
+
+    stages {
+        stage('Checkout Code') {
+            steps {
+                git branch: "${params.Branch}", url: 'https://github.com/MuddyThunder1040/code-scripts.git'
             }
         }
 
+        stage('Terraform Operation') {
+            steps {
+                sh "cd ${params.Module} && terraform init"
+                sh "cd ${params.Module} && terraform ${params.Action}"
+            }
+        }
     }
 
-    post
-    {
-        always
-        {
-            echo "Cleaning up workspace..."
+    post {
+        always {
+            echo 'Cleaning up workspace...'
             cleanWs()
         }
-        success
-        {
-            echo "Terraform ${Action} completed successfully for ${Module} module on ${Branch} branch."
-            slackSend message: "✅ Terraform ${Action} completed successfully for ${Module} module on ${Branch} branch.", color: 'good'
+        success {
+            echo "Terraform ${params.Action} completed successfully for ${params.Module} module on ${params.Branch} branch."
+            slackSend message: "Terraform ${params.Action} completed successfully for ${params.Module} module on ${params.Branch} branch.", color: 'good'
         }
-        failure
-        {
-            echo "Terraform ${Action} failed for ${Module} module on ${Branch} branch."
-            slackSend message: "❌ Terraform ${Action} failed for ${Module} module on ${Branch} branch.", color: 'danger'
+        failure {
+            echo "Terraform ${params.Action} failed for ${params.Module} module on ${params.Branch} branch."
+            slackSend message: "Terraform ${params.Action} failed for ${params.Module} module on ${params.Branch} branch.", color: 'danger'
         }
     }
 }
