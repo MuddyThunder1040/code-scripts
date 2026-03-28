@@ -1,4 +1,5 @@
-pipeline{
+pipeline
+{
     agent Dell-Server
         options
         {
@@ -42,4 +43,5 @@ pipeline{
             echo "Terraform ${Action} failed for ${Module} module on ${Branch} branch."
             slackSend message: "❌ Terraform ${Action} failed for ${Module} module on ${Branch} branch.", color: 'danger'
         }
-            
+    }
+}
