@@ -1,20 +1,30 @@
-resource "local_file" "cpuinfofile" {
-  filename = "${path.module}/cpuinfo.txt"
-  content  = <<-EOT
-    processor   : 0
-    vendor_id   : GenuineIntel
-    cpu family  : 6
-    model       : 142
-    model name  : Intel(R) Core(TM) i7-8550U CPU @ 1.80GHz
-  EOT
+terraform {
+  required_providers {
+    local = {
+      source = "hashicorp/local"
+      version = "~> 2.4"
+    }
+    null = {
+      source = "hashicorp/null"
+      version = "~> 3.0"
+    }
+  }
+}
+provider "local" {
+  
 }
 
-data "local_file" "meminfo" {
-  filename = "${path.module}/meminfo.txt"
-  content  = "${file("${path.module}/JenkinsfileSoftwareCheck")}"
+provider "null" {
 }
-resource "local_sensitive_file" "name" {
-  filename = "${path.module}/name.txt"
-  content  = data.local_file.meminfo.content
 
+resource "local_file" "terraform-created-file" {
+  filename = "ipinfo.txt"
+  file_permission = 777
+  content = "${path.module}"
+}
+
+resource "null_resource" "example" {
+  provisioner "local-exec" {
+    command = "ifconfig > hello.txt"
+  }
 }
