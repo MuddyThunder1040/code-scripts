@@ -1,0 +1,51 @@
+name: Software Check
+
+on:
+  workflow_dispatch:
+
+jobs:
+  validate:
+    runs-on: [self-hosted, DELL]
+    outputs:
+      failed_tools: ${{ steps.check.outputs.failed_tools }}
+
+    steps:
+      - name: Validate installed tools
+        id: check
+        run: |
+          failures=()
+
+          check_tool() {
+            local name="$1"
+            local cmd="$2"
+            if output=$(eval "$cmd" 2>&1); then
+              echo "[PASS] $name: $(echo "$output" | head -1)"
+            else
+              echo "[FAIL] $name: NOT FOUND or ERROR"
+              failures+=("$name")
+            fi
+          }
+
+          echo "============================================================"
+          echo "          TOOL VALIDATION SUMMARY"
+          echo "============================================================"
+
+          check_tool "Git"        "git --version"
+          check_tool "Java (JDK)" "java -version"
+          check_tool "Docker"     "docker --version"
+          check_tool "Terraform"  "terraform --version"
+          check_tool "AWS CLI"    "aws --version"
+          check_tool "Python"     "python3 --version"
+          check_tool "rsync"      "rsync --version"
+          check_tool "curl"       "curl --version"
+
+          echo "============================================================"
+
+          if [ ${#failures[@]} -gt 0 ]; then
+            failed_csv=$(IFS=','; echo "${failures[*]}")
+            echo "failed_tools=$failed_csv" >> "$GITHUB_OUTPUT"
+            echo "::error::Missing or failed tools: $failed_csv"
+            exit 1
+          fi
+
+          echo "All required tools are installed and accessible."

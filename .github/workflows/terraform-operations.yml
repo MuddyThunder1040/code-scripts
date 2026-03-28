@@ -1,0 +1,62 @@
+name: Terraform Operations
+
+on:
+  workflow_dispatch:
+    inputs:
+      module:
+        description: 'Terraform module directory'
+        required: true
+        type: choice
+        options: [Local, Instance, S3]
+      branch:
+        description: 'Git branch to use' 
+        required: true
+        default: main
+      action:
+        description: 'Terraform action'
+        required: true
+        type: choice
+        options: [plan, apply, show, destroy, validate]
+
+jobs:
+  terraform:
+    runs-on: [self-hosted, DELL]
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.branch }}
+
+      - name: Terraform init
+        working-directory: ${{ inputs.module }}
+        run: terraform init
+
+      - name: Terraform ${{ inputs.action }}
+        working-directory: ${{ inputs.module }}
+        run: |
+          if [ "${{ inputs.action }}" = "apply" ]; then
+            terraform apply -auto-approve
+          else
+            terraform ${{ inputs.action }}
+          fi
+
+      - name: Notify Slack (success)
+        if: success() && inputs.action == 'apply'
+        run: |
+          curl -s -X POST -H 'Content-type: application/json' \
+            --data '{"text":"Terraform apply completed successfully for ${{ inputs.module }} module on ${{ inputs.branch }} branch.","color":"good"}' \
+            "${{ secrets.SLACK_WEBHOOK_URL }}"
+
+      - name: Notify Slack (failure)
+        if: failure() && inputs.action == 'apply'
+        run: |
+          curl -s -X POST -H 'Content-type: application/json' \
+            --data '{"text":"Terraform apply failed for ${{ inputs.module }} module on ${{ inputs.branch }} branch.","color":"danger"}' \
+            "${{ secrets.SLACK_WEBHOOK_URL }}"
+
+      - name: Cleanup workspace
+        if: always()
+        run: |
+          cd "${{ github.workspace }}"
+          git clean -fdx
