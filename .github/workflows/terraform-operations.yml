@@ -45,14 +45,24 @@ jobs:
         if: success() && inputs.action == 'apply'
         run: |
           curl -s -X POST -H 'Content-type: application/json' \
-            --data '{"text":"Terraform apply completed successfully for ${{ inputs.module }} module on ${{ inputs.branch }} branch.","color":"good"}' \
+            --data '{
+              "attachments": [{
+                "color": "good",
+                "text": "Terraform apply completed successfully for ${{ inputs.module }} module on ${{ inputs.branch }} branch."
+              }]
+            }' \
             "${{ secrets.SLACK_WEBHOOK_URL }}"
 
       - name: Notify Slack (failure)
         if: failure() && inputs.action == 'apply'
         run: |
           curl -s -X POST -H 'Content-type: application/json' \
-            --data '{"text":"Terraform apply failed for ${{ inputs.module }} module on ${{ inputs.branch }} branch.","color":"danger"}' \
+            --data '{
+              "attachments": [{
+                "color": "danger",
+                "text": "Terraform apply failed for ${{ inputs.module }} module on ${{ inputs.branch }} branch."
+              }]
+            }' \
             "${{ secrets.SLACK_WEBHOOK_URL }}"
 
       - name: Cleanup workspace
