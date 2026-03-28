@@ -1,5 +1,5 @@
 pipeline {
-    agent { label 'Dell-Server' }
+    agent { label 'DELL' }
 
     options {
         timestamps()
@@ -43,14 +43,14 @@ pipeline {
             steps {
                 script {
                     def installerMap = [
-                        'Git'       : [apt: 'git',         dnf: 'git',             yum: 'git'],
-                        'Java (JDK)': [apt: 'default-jdk', dnf: 'java-17-openjdk', yum: 'java-17-openjdk'],
-                        'Docker'    : [apt: 'docker.io',   dnf: 'docker',          yum: 'docker'],
-                        'Terraform' : [apt: 'terraform',   dnf: 'terraform',       yum: 'terraform'],
-                        'AWS CLI'   : [apt: 'awscli',      dnf: 'awscli',          yum: 'awscli'],
-                        'Python'    : [apt: 'python3',     dnf: 'python3',         yum: 'python3'],
-                        'rsync'     : [apt: 'rsync',       dnf: 'rsync',           yum: 'rsync'],
-                        'curl'      : [apt: 'curl',        dnf: 'curl',            yum: 'curl'],
+                        'Git'       : [apt: 'git',         dnf: 'git',             yum: 'git',             brew: 'git'],
+                        'Java (JDK)': [apt: 'default-jdk', dnf: 'java-17-openjdk', yum: 'java-17-openjdk', brew: 'openjdk'],
+                        'Docker'    : [apt: 'docker.io',   dnf: 'docker',          yum: 'docker',          brew: 'docker'],
+                        'Terraform' : [apt: 'terraform',   dnf: 'terraform',       yum: 'terraform',       brew: 'terraform'],
+                        'AWS CLI'   : [apt: 'awscli',      dnf: 'awscli',          yum: 'awscli',          brew: 'awscli'],
+                        'Python'    : [apt: 'python3',     dnf: 'python3',         yum: 'python3',         brew: 'python'],
+                        'rsync'     : [apt: 'rsync',       dnf: 'rsync',           yum: 'rsync',           brew: 'rsync'],
+                        'curl'      : [apt: 'curl',        dnf: 'curl',            yum: 'curl',            brew: 'curl'],
                     ]
 
                     def failedTools = env.NORMALIZED_FAILED_TOOLS
@@ -80,6 +80,8 @@ pipeline {
                                     echo dnf
                                 elif command -v yum >/dev/null 2>&1; then
                                     echo yum
+                                elif command -v brew >/dev/null 2>&1; then
+                                    echo brew
                                 else
                                     echo unsupported
                                 fi
@@ -108,6 +110,9 @@ pipeline {
                                     ;;
                                 yum)
                                     \$SUDO yum install -y ${packages.yum}
+                                    ;;
+                                brew)
+                                    brew install ${packages.brew}
                                     ;;
                             esac
                         """
