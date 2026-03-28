@@ -1,0 +1,118 @@
+name: Software Install
+
+on:
+  workflow_dispatch:
+    inputs:
+      failed_tools:
+        description: 'Comma-separated tools to install (e.g. Docker, Terraform, AWS CLI)'
+        required: true
+
+jobs:
+  install:
+    runs-on: [self-hosted, DELL]
+
+    steps:
+      - name: Install missing tools
+        run: |
+          declare -A APT_PACKAGES=(
+            ["Git"]="git"
+            ["Java (JDK)"]="default-jdk"
+            ["Docker"]="docker.io"
+            ["Terraform"]="terraform"
+            ["AWS CLI"]="awscli"
+            ["Python"]="python3"
+            ["rsync"]="rsync"
+            ["curl"]="curl"
+          )
+          declare -A DNF_PACKAGES=(
+            ["Git"]="git"
+            ["Java (JDK)"]="java-17-openjdk"
+            ["Docker"]="docker"
+            ["Terraform"]="terraform"
+            ["AWS CLI"]="awscli"
+            ["Python"]="python3"
+            ["rsync"]="rsync"
+            ["curl"]="curl"
+          )
+          declare -A BREW_PACKAGES=(
+            ["Git"]="git"
+            ["Java (JDK)"]="openjdk"
+            ["Docker"]="docker"
+            ["Terraform"]="terraform"
+            ["AWS CLI"]="awscli"
+            ["Python"]="python"
+            ["rsync"]="rsync"
+            ["curl"]="curl"
+          )
+
+          if   command -v apt-get >/dev/null 2>&1; then PKG_MANAGER=apt
+          elif command -v dnf     >/dev/null 2>&1; then PKG_MANAGER=dnf
+          elif command -v yum     >/dev/null 2>&1; then PKG_MANAGER=yum
+          elif command -v brew    >/dev/null 2>&1; then PKG_MANAGER=brew
+          else echo "No supported package manager found"; exit 1; fi
+
+          SUDO=$(command -v sudo >/dev/null 2>&1 && echo "sudo" || echo "")
+
+          IFS=',' read -ra TOOLS <<< "${{ inputs.failed_tools }}"
+
+          for raw_tool in "${TOOLS[@]}"; do
+            tool=$(echo "$raw_tool" | xargs)
+            [ -z "$tool" ] && continue
+
+            echo "[INFO] Installing: $tool"
+
+            case "$PKG_MANAGER" in
+              apt)
+                pkg="${APT_PACKAGES[$tool]}"
+                if [ -z "$pkg" ]; then echo "[SKIP] $tool: no apt mapping"; continue; fi
+                $SUDO apt-get update -q
+                $SUDO apt-get install -y "$pkg"
+                ;;
+              dnf|yum)
+                pkg="${DNF_PACKAGES[$tool]}"
+                if [ -z "$pkg" ]; then echo "[SKIP] $tool: no dnf/yum mapping"; continue; fi
+                $SUDO "$PKG_MANAGER" install -y "$pkg"
+                ;;
+              brew)
+                pkg="${BREW_PACKAGES[$tool]}"
+                if [ -z "$pkg" ]; then echo "[SKIP] $tool: no brew mapping"; continue; fi
+                brew install "$pkg"
+                ;;
+            esac
+          done
+
+      - name: Verify installation
+        run: |
+          declare -A VERIFY_CMDS=(
+            ["Git"]="git --version"
+            ["Java (JDK)"]="java -version"
+            ["Docker"]="docker --version"
+            ["Terraform"]="terraform --version"
+            ["AWS CLI"]="aws --version"
+            ["Python"]="python3 --version"
+            ["rsync"]="rsync --version"
+            ["curl"]="curl --version"
+          )
+
+          failures=()
+          IFS=',' read -ra TOOLS <<< "${{ inputs.failed_tools }}"
+
+          for raw_tool in "${TOOLS[@]}"; do
+            tool=$(echo "$raw_tool" | xargs)
+            [ -z "$tool" ] && continue
+
+            cmd="${VERIFY_CMDS[$tool]}"
+            if [ -z "$cmd" ]; then continue; fi
+
+            if output=$(eval "$cmd" 2>&1); then
+              echo "[PASS] $tool: $(echo "$output" | head -1)"
+            else
+              echo "[FAIL] $tool: still not available after install"
+              failures+=("$tool")
+            fi
+          done
+
+          if [ ${#failures[@]} -gt 0 ]; then
+            echo "::error::Still unavailable after installation: $(IFS=','; echo "${failures[*]}")"
+            exit 1
+          fi

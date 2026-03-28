@@ -1,5 +1,7 @@
 pipeline {
+
     agent { label 'DELL' }
+
 
     options {
         timestamps()
