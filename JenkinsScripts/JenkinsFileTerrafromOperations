@@ -45,11 +45,16 @@ pipeline {
         }
         success {
             echo "Terraform ${params.Action} completed successfully for ${params.Module} module on ${params.Branch} branch."
-            slackSend message: "Terraform ${params.Action} completed successfully for ${params.Module} module on ${params.Branch} branch.", color: 'good'
+            if (params.Action == 'apply') {
+                slackSend message: "Terraform ${params.Action} completed successfully for ${params.Module} module on ${params.Branch} branch.", color: 'good'
+            }
         }
+
         failure {
             echo "Terraform ${params.Action} failed for ${params.Module} module on ${params.Branch} branch."
-            slackSend message: "Terraform ${params.Action} failed for ${params.Module} module on ${params.Branch} branch.", color: 'danger'
+            if (params.Action == 'apply') {
+                slackSend message: "Terraform ${params.Action} failed for ${params.Module} module on ${params.Branch} branch.", color: 'danger'
+            }
         }
     }
 }
