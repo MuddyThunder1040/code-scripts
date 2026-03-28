@@ -1,6 +1,5 @@
 pipeline {
-
-    agent { label 'DELL' }
+    agent D
 
 
     options {

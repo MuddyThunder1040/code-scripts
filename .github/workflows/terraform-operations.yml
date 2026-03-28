@@ -20,7 +20,7 @@ on:
 
 jobs:
   terraform:
-    runs-on: [self-hosted, DELL]
+    runs-on: [self-hosted, Linux, X64]
 
     steps:
       - name: Checkout code

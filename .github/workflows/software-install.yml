@@ -9,7 +9,7 @@ on:
 
 jobs:
   install:
-    runs-on: [self-hosted, DELL]
+    runs-on: [self-hosted, Linux, X64]
 
     steps:
       - name: Install missing tools
