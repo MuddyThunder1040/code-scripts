@@ -14,7 +14,7 @@ terraform {
 terraform {
   backend "s3" {
     bucket         = "terraform-backup-tank"
-    key            = "dev/terraform.tfstate"
+    key            = "Local/terraform.tfstate"
     region         = "us-east-2"
     dynamodb_table = "terraform-locks"
     encrypt        = true
