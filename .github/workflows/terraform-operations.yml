@@ -35,7 +35,7 @@ jobs:
       - name: Terraform ${{ inputs.action }}
         working-directory: ${{ inputs.module }}
         run: |
-          if [ "${{ inputs.action }}" = "apply" ]; then
+          if [ "${{ inputs.action }}" = "apply" || "${{ inputs.action }}" = "destroy" ]; then
             terraform apply -auto-approve
           else
             terraform ${{ inputs.action }}
