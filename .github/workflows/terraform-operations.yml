@@ -71,4 +71,5 @@ jobs:
         if: always()
         run: |
           cd "${{ github.workspace }}"
-          git clean -fdx
+          # Clean untracked files but preserve Terraform state and cache
+          git clean -fdx --exclude="**/terraform.tfstate" --exclude="**/.terraform/" --exclude="**/.terraform.lock.hcl"
