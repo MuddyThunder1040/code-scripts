@@ -35,32 +35,34 @@ jobs:
       - name: Terraform ${{ inputs.action }}
         working-directory: ${{ inputs.module }}
         run: |
-          if [ "${{ inputs.action }}" = "apply" || "${{ inputs.action }}" = "destroy" ]; then
+          if [ "${{ inputs.action }}" = "apply" ]; then
             terraform apply -auto-approve
+          elif [ "${{ inputs.action }}" = "destroy" ]; then
+            terraform destroy -auto-approve
           else
             terraform ${{ inputs.action }}
           fi
 
       - name: Notify Slack (success)
-        if: success() && inputs.action == 'apply'
+        if: success() && (inputs.action == 'apply' || inputs.action == 'destroy')
         run: |
           curl -s -X POST -H 'Content-type: application/json' \
             --data '{
               "attachments": [{
                 "color": "good",
-                "text": "Terraform apply completed successfully for ${{ inputs.module }} module on ${{ inputs.branch }} branch."
+                "text": "Terraform ${{ inputs.action }} completed successfully for ${{ inputs.module }} module on ${{ inputs.branch }} branch."
               }]
             }' \
             "${{ secrets.SLACK_WEBHOOK_URL }}"
 
       - name: Notify Slack (failure)
-        if: failure() && inputs.action == 'apply'
+        if: failure() && (inputs.action == 'apply' || inputs.action == 'destroy')
         run: |
           curl -s -X POST -H 'Content-type: application/json' \
             --data '{
               "attachments": [{
                 "color": "danger",
-                "text": "Terraform apply failed for ${{ inputs.module }} module on ${{ inputs.branch }} branch."
+                "text": "Terraform ${{ inputs.action }} failed for ${{ inputs.module }} module on ${{ inputs.branch }} branch."
               }]
             }' \
             "${{ secrets.SLACK_WEBHOOK_URL }}"
