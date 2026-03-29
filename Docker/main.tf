@@ -11,6 +11,17 @@ provider "docker" {
   
 }
 
+terraform {
+  backend "s3" {
+    bucket         = "terraform-backup-tank"
+    key            = "Docker/terraform.tfstate"
+    region         = "us-east-2"
+    dynamodb_table = "terraform-locks"
+    encrypt        = true
+  }
+}
+
+
 resource "docker_image" "nginx" {
   name = "nginx:latest"
 }
