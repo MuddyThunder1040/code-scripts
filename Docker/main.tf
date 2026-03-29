@@ -21,7 +21,6 @@ terraform {
   }
 }
 
-
 resource "docker_image" "nginx" {
   name = "nginx:latest"
 }
@@ -32,5 +31,9 @@ resource "docker_container" "nginx_container" {
   ports {
     internal = 80
     external = 8080
+  }
+  lifecycle {
+    create_before_destroy = true
+    prevent_destroy = false
   }
 }
