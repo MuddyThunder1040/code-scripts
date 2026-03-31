@@ -12,7 +12,7 @@ pipeline{
     stages{
         stage('AWS CLI Check - Existing Nodes'){
             steps{
-                build job: 'JenkinsFileone', wait: true, propagate: true, parameters: [
+                build job: 'expansion-pipeline/one-pipeline', wait: true, propagate: true, parameters: [
                     string(name: 'NameSpace', value: params.NameSpace),
                     string(name: 'Environment', value: params.Environment),
                     string(name: 'Module', value: params.Module),
