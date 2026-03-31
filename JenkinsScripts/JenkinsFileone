@@ -16,6 +16,8 @@ pipeline{
                 echo "========= Executing AWS CLI commands for ${params.NameSpace} in ${params.Environment} environment for ${params.Module} module . ========="
                 // Here you can add the actual AWS CLI commands based on the parameters
                 echo "AWS CLI execution completed for ${params.NameSpace} in ${params.Environment} environment for ${params.Module} module."
+                // TODO  : Generate a random sample size between 5 and 40 and create a list of random IP addresses to before.txt file in the workspace
+
 
             }
 
@@ -35,6 +37,7 @@ pipeline{
                     echo "========= Executing AWS CLI commands for ${params.NameSpace} in ${params.Environment} environment for ${params.Module} module . ========="
                     // Here you can add the actual AWS CLI commands based on the parameters
                     echo "AWS CLI execution completed for ${params.NameSpace} in ${params.Environment} environment for ${params.Module} module."
+                    // TODO  : Add the generated IP addresses with few new nodes or none to after.txt file in the workspace
 
             }
         }

@@ -1,0 +1,28 @@
+pipeline{
+    agent any
+        parameters{
+        choice(name: 'NameSpace', choices: ['srh', 'csk', 'rcb'], description: 'Enter the name space')
+        choice(name: 'Environment', choices: ['dev', 'qa', 'prod'], description: 'Select the environment')
+        choice(name: 'Module', choices: ['db', 'app', 'api'], description: 'Select the module')
+        choice(name: 'TerraformOperation', choices: ['init', 'plan', 'apply'], description: 'Select the terraform operation')
+        choice(name: 'TopologyBranch', choices: ['main', 'develop', 'feature'], description: 'Select the git branch')
+        choice(name: 'ModuleBranch', choices: ['main', 'develop', 'feature'], description: 'Select the git branch')
+        choice(name: 'UtilityBranch', choices: ['main', 'develop', 'feature'], description: 'Select the git branch')
+        string(name: 'HostList', defaultValue: '', description: 'Enter the host list')
+    }
+    stages{
+        stage("Ansible config refresh Printing Parameters"){
+            steps{
+                echo "========= Printing Parameters ========="
+                echo "NameSpace: ${params.NameSpace}"
+                echo "Environment: ${params.Environment}"
+                echo "Module: ${params.Module}"
+                echo "Terraform Operation: ${params.TerraformOperation}"
+                echo "Topology Branch: ${params.TopologyBranch}"
+                echo "Module Branch: ${params.ModuleBranch}"
+                echo "Utility Branch: ${params.UtilityBranch}"
+                echo "Host List: ${params.HostList}"
+            }
+        }
+    }
+}
