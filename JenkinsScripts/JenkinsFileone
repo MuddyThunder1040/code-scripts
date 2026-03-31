@@ -1,4 +1,5 @@
 pipeline{
+    agent any
     parameters{
         choice(name: 'NameSpace', choices: ['srh', 'csk', 'rcb'], description: 'Enter the name space')
         choice(name: 'Environment', choices: ['dev', 'qa', 'prod'], description: 'Select the environment')
