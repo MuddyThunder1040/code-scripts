@@ -7,7 +7,6 @@ pipeline{
         choice(name: 'TerraformOperation', choices: ['init', 'plan', 'apply'], description: 'Select the terraform operation')
         choice(name: 'TopologyBranch', choices: ['main', 'develop', 'feature'], description: 'Select the git branch')
         choice(name: 'ModuleBranch', choices: ['main', 'develop', 'feature'], description: 'Select the git branch')
-        choice(name: 'utilityBranch', choices: ['main', 'develop', 'feature'], description: 'Select the git branch')
     }
     stages{
         stage('Executing AWS CLI to check existing nodes'){
