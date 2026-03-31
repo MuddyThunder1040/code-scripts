@@ -12,7 +12,7 @@ pipeline{
     stages{
         stage('AWS CLI Check - Existing Nodes'){
             steps{
-                build job: 'expansion-pipeline/one-pipeline', wait: true, propagate: true, parameters: [
+                build job: "expansion-pipeline/one-pipeline/${params.TopologyBranch}", wait: true, propagate: true, parameters: [
                     string(name: 'NameSpace', value: params.NameSpace),
                     string(name: 'Environment', value: params.Environment),
                     string(name: 'Module', value: params.Module),
@@ -20,7 +20,7 @@ pipeline{
                     string(name: 'TopologyBranch', value: params.TopologyBranch),
                     string(name: 'ModuleBranch', value: params.ModuleBranch)
                 ]
-                copyArtifacts projectName: 'JenkinsFileone', selector: lastSuccessful(), fingerprintArtifacts: true
+                copyArtifacts projectName: "expansion-pipeline/one-pipeline/${params.TopologyBranch}", selector: lastSuccessful(), fingerprintArtifacts: true
                 script {
                     env.IP_LIST = readFile('ip_list.txt').trim()
                     echo "Parsed IP list from JenkinsFileone:\n${env.IP_LIST}"
