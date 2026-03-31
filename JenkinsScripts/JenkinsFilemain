@@ -13,12 +13,12 @@ pipeline{
         stage('AWS CLI Check - Existing Nodes'){
             steps{
                 build job: 'JenkinsFileone', wait: true, propagate: true, parameters: [
-                    choice(name: 'NameSpace', value: params.NameSpace),
-                    choice(name: 'Environment', value: params.Environment),
-                    choice(name: 'Module', value: params.Module),
-                    choice(name: 'TerraformOperation', value: params.TerraformOperation),
-                    choice(name: 'TopologyBranch', value: params.TopologyBranch),
-                    choice(name: 'ModuleBranch', value: params.ModuleBranch)
+                    string(name: 'NameSpace', value: params.NameSpace),
+                    string(name: 'Environment', value: params.Environment),
+                    string(name: 'Module', value: params.Module),
+                    string(name: 'TerraformOperation', value: params.TerraformOperation),
+                    string(name: 'TopologyBranch', value: params.TopologyBranch),
+                    string(name: 'ModuleBranch', value: params.ModuleBranch)
                 ]
                 copyArtifacts projectName: 'JenkinsFileone', selector: lastSuccessful(), fingerprintArtifacts: true
                 script {
@@ -30,12 +30,12 @@ pipeline{
         stage('Ansible Config Refresh'){
             steps{
                 build job: 'JenkinsFiletwo', wait: true, propagate: true, parameters: [
-                    choice(name: 'NameSpace', value: params.NameSpace),
-                    choice(name: 'Environment', value: params.Environment),
-                    choice(name: 'Module', value: params.Module),
-                    choice(name: 'TerraformOperation', value: params.TerraformOperation),
-                    choice(name: 'TopologyBranch', value: params.TopologyBranch),
-                    choice(name: 'ModuleBranch', value: params.ModuleBranch),
+                    string(name: 'NameSpace', value: params.NameSpace),
+                    string(name: 'Environment', value: params.Environment),
+                    string(name: 'Module', value: params.Module),
+                    string(name: 'TerraformOperation', value: params.TerraformOperation),
+                    string(name: 'TopologyBranch', value: params.TopologyBranch),
+                    string(name: 'ModuleBranch', value: params.ModuleBranch),
                     string(name: 'HostList', value: env.IP_LIST)
                 ]
             }
@@ -43,13 +43,13 @@ pipeline{
         stage('Validate New Nodes'){
             steps{
                 build job: 'JenkinsFilethree', wait: true, propagate: true, parameters: [
-                    choice(name: 'NameSpace', value: params.NameSpace),
-                    choice(name: 'Environment', value: params.Environment),
-                    choice(name: 'Module', value: params.Module),
-                    choice(name: 'TerraformOperation', value: params.TerraformOperation),
-                    choice(name: 'TopologyBranch', value: params.TopologyBranch),
-                    choice(name: 'ModuleBranch', value: params.ModuleBranch),
-                    choice(name: 'UtilityBranch', value: params.UtilityBranch),
+                    string(name: 'NameSpace', value: params.NameSpace),
+                    string(name: 'Environment', value: params.Environment),
+                    string(name: 'Module', value: params.Module),
+                    string(name: 'TerraformOperation', value: params.TerraformOperation),
+                    string(name: 'TopologyBranch', value: params.TopologyBranch),
+                    string(name: 'ModuleBranch', value: params.ModuleBranch),
+                    string(name: 'UtilityBranch', value: params.UtilityBranch),
                     string(name: 'RackList', value: env.IP_LIST)
                 ]
             }
@@ -57,13 +57,13 @@ pipeline{
         stage('Check DSE Status'){
             steps{
                 build job: 'JenkinsFilefour', wait: true, propagate: true, parameters: [
-                    choice(name: 'NameSpace', value: params.NameSpace),
-                    choice(name: 'Environment', value: params.Environment),
-                    choice(name: 'Module', value: params.Module),
-                    choice(name: 'TerraformOperation', value: params.TerraformOperation),
-                    choice(name: 'TopologyBranch', value: params.TopologyBranch),
-                    choice(name: 'ModuleBranch', value: params.ModuleBranch),
-                    choice(name: 'UtilityBranch', value: params.UtilityBranch),
+                    string(name: 'NameSpace', value: params.NameSpace),
+                    string(name: 'Environment', value: params.Environment),
+                    string(name: 'Module', value: params.Module),
+                    string(name: 'TerraformOperation', value: params.TerraformOperation),
+                    string(name: 'TopologyBranch', value: params.TopologyBranch),
+                    string(name: 'ModuleBranch', value: params.ModuleBranch),
+                    string(name: 'UtilityBranch', value: params.UtilityBranch),
                     string(name: 'HostList', value: env.IP_LIST)
                 ]
             }
