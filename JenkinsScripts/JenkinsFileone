@@ -1,0 +1,81 @@
+pipeline{
+    agent any
+    parameters{
+        choice(name: 'NameSpace', choices: ['srh', 'csk', 'rcb'], description: 'Enter the name space')
+        choice(name: 'Environment', choices: ['dev', 'qa', 'prod'], description: 'Select the environment')
+        choice(name: 'Module', choices: ['db', 'app', 'api'], description: 'Select the module')
+        choice(name: 'TerraformOperation', choices: ['init', 'plan', 'apply'], description: 'Select the terraform operation')
+        choice(name: 'TopologyBranch', choices: ['main', 'develop', 'feature'], description: 'Select the git branch')
+        choice(name: 'ModuleBranch', choices: ['main', 'develop', 'feature'], description: 'Select the git branch')
+    }
+    stages{
+        stage('Executing AWS CLI to check existing nodes'){
+            steps{
+
+                echo "========= Executing AWS CLI commands for ${params.NameSpace} in ${params.Environment} environment for ${params.Module} module . ========="
+                // Here you can add the actual AWS CLI commands based on the parameters
+                echo "AWS CLI execution completed for ${params.NameSpace} in ${params.Environment} environment for ${params.Module} module."
+                // TODO  : Generate a random sample size between 5 and 40 and create a list of random IP addresses to before.txt file in the workspace
+
+
+            }
+
+        }
+            stage('Executing Terraform Commands'){
+                steps{
+
+                    echo "========= Executing Terraform commands for ${params.NameSpace} in ${params.Environment} environment for ${params.Module} module with ${params.TerraformOperation} operation. ========="
+                    // Here you can add the actual Terraform commands based on the parameters
+                    echo "Terraform execution completed for ${params.NameSpace} in ${params.Environment} environment for ${params.Module} module with ${params.TerraformOperation} operation."
+
+            }
+        }
+            stage('Executing AWS CLI to check new nodes'){
+                steps{
+
+                    echo "========= Executing AWS CLI commands for ${params.NameSpace} in ${params.Environment} environment for ${params.Module} module . ========="
+                    // Here you can add the actual AWS CLI commands based on the parameters
+                    echo "AWS CLI execution completed for ${params.NameSpace} in ${params.Environment} environment for ${params.Module} module."
+                    // TODO  : Add the generated IP addresses with few new nodes or none to after.txt file in the workspace
+
+            }
+        }
+            stage('Creating and adding ip list to workspace'){
+                steps{
+
+                    echo "========= Creating and adding ip list to workspace for ${params.NameSpace} in ${params.Environment} environment for ${params.Module} module . ========="
+                    // Here you can add the actual commands to create and add ip list to workspace based on the parameters
+                    echo "IP list creation and addition to workspace completed for ${params.NameSpace} in ${params.Environment} environment for ${params.Module} module."
+
+                    sh '''
+                    # Generate a random sample size between 5 and 40 for existing nodes
+                    count=$((RANDOM % 36 + 5))
+                    echo "Generating ${count} random IP addresses into ${WORKSPACE}/ip_list.txt"
+
+                    # Create random IPv4 addresses for existing nodes
+                    for i in $(seq 1 "$count"); do
+                      echo "$((RANDOM % 223 + 1)).$((RANDOM % 256)).$((RANDOM % 256)).$((RANDOM % 256))"
+                    done > "${WORKSPACE}/ip_list.txt"
+
+                    echo "Generated IP list:"
+                    cat "${WORKSPACE}/ip_list.txt"
+
+                    # Generate a random number of new nodes (1 to 5) and append to create new_ip_list.txt
+                    new_count=$((RANDOM % 5 + 1))
+                    echo "Adding ${new_count} new IP addresses into ${WORKSPACE}/new_ip_list.txt"
+
+                    cp "${WORKSPACE}/ip_list.txt" "${WORKSPACE}/new_ip_list.txt"
+                    for i in $(seq 1 "$new_count"); do
+                      echo "$((RANDOM % 223 + 1)).$((RANDOM % 256)).$((RANDOM % 256)).$((RANDOM % 256))"
+                    done >> "${WORKSPACE}/new_ip_list.txt"
+
+                    echo "Generated new IP list (existing + new nodes):"
+                    cat "${WORKSPACE}/new_ip_list.txt"
+                    '''
+
+                archiveArtifacts artifacts: 'ip_list.txt, new_ip_list.txt', fingerprint: true
+
+            }
+}
+    }
+}

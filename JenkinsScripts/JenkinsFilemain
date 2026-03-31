@@ -1,0 +1,85 @@
+pipeline{
+    agent any
+    parameters{
+        choice(name: 'NameSpace', choices: ['srh', 'csk', 'rcb'], description: 'Enter the name space')
+        choice(name: 'Environment', choices: ['dev', 'qa', 'prod'], description: 'Select the environment')
+        choice(name: 'Module', choices: ['db', 'app', 'api'], description: 'Select the module')
+        choice(name: 'TerraformOperation', choices: ['init', 'plan', 'apply'], description: 'Select the terraform operation')
+        choice(name: 'TopologyBranch', choices: ['main', 'develop', 'feature'], description: 'Select the git branch')
+        choice(name: 'ModuleBranch', choices: ['main', 'develop', 'feature'], description: 'Select the git branch')
+        choice(name: 'UtilityBranch', choices: ['main', 'develop', 'feature'], description: 'Select the git branch')
+    }
+    stages{
+        stage('Approve Terraform Apply'){
+            when{
+                expression { params.TerraformOperation == 'apply' }
+            }
+            steps{
+                input message: "Approve Terraform 'apply' operation for ${params.NameSpace} in ${params.Environment} (${params.Module})?", ok: "Approve"
+            }
+        }
+        stage('AWS CLI Check - Existing Nodes'){
+            steps{
+                build job: "expansion-pipeline/one-pipeline/${env.BRANCH_NAME}", wait: true, propagate: true, parameters: [
+                    string(name: 'NameSpace', value: params.NameSpace),
+                    string(name: 'Environment', value: params.Environment),
+                    string(name: 'Module', value: params.Module),
+                    string(name: 'TerraformOperation', value: params.TerraformOperation),
+                    string(name: 'TopologyBranch', value: params.TopologyBranch),
+                    string(name: 'ModuleBranch', value: params.ModuleBranch)
+                ]
+                copyArtifacts projectName: "expansion-pipeline/one-pipeline/${env.BRANCH_NAME}", filter: 'ip_list.txt, new_ip_list.txt', fingerprintArtifacts: true
+                script {
+                    env.IP_LIST = readFile('ip_list.txt').trim()
+                    env.NEW_IP_LIST = readFile('new_ip_list.txt').trim()
+                    echo "Parsed IP list from JenkinsFileone:\n${env.IP_LIST}"
+                    echo "Parsed new IP list from JenkinsFileone:\n${env.NEW_IP_LIST}"
+                }
+            }
+        }
+        
+
+
+        stage('Ansible Config Refresh'){
+            steps{
+                build job: "expansion-pipeline/two-pipeline/${env.BRANCH_NAME}", wait: true, propagate: true, parameters: [
+                    string(name: 'NameSpace', value: params.NameSpace),
+                    string(name: 'Environment', value: params.Environment),
+                    string(name: 'Module', value: params.Module),
+                    string(name: 'TerraformOperation', value: params.TerraformOperation),
+                    string(name: 'TopologyBranch', value: params.TopologyBranch),
+                    string(name: 'ModuleBranch', value: params.ModuleBranch),
+                    string(name: 'HostList', value: env.IP_LIST)
+                ]
+            }
+        }
+        stage('Validate New Nodes'){
+            steps{
+                build job: "expansion-pipeline/three-pipeline/${env.BRANCH_NAME}", wait: true, propagate: true, parameters: [
+                    string(name: 'NameSpace', value: params.NameSpace),
+                    string(name: 'Environment', value: params.Environment),
+                    string(name: 'Module', value: params.Module),
+                    string(name: 'TerraformOperation', value: params.TerraformOperation),
+                    string(name: 'TopologyBranch', value: params.TopologyBranch),
+                    string(name: 'ModuleBranch', value: params.ModuleBranch),
+                    string(name: 'UtilityBranch', value: params.UtilityBranch),
+                    string(name: 'RackList', value: env.NEW_IP_LIST)
+                ]
+            }
+        }
+        stage('Check DSE Status'){
+            steps{
+                build job: "expansion-pipeline/four-pipeline/${env.BRANCH_NAME}", wait: true, propagate: true, parameters: [
+                    string(name: 'NameSpace', value: params.NameSpace),
+                    string(name: 'Environment', value: params.Environment),
+                    string(name: 'Module', value: params.Module),
+                    string(name: 'TerraformOperation', value: params.TerraformOperation),
+                    string(name: 'TopologyBranch', value: params.TopologyBranch),
+                    string(name: 'ModuleBranch', value: params.ModuleBranch),
+                    string(name: 'UtilityBranch', value: params.UtilityBranch),
+                    string(name: 'HostList', value: env.NEW_IP_LIST)
+                ]
+            }
+        }
+    }
+}
