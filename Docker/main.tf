@@ -11,7 +11,7 @@ provider "docker" {
   
 }
 
-terraform {
+rterraform {
   backend "s3" {
     bucket         = "terraform-backup-tank"
     key            = "Docker/terraform.tfstate"
