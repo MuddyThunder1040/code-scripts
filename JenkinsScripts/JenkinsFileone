@@ -61,6 +61,8 @@ pipeline{
                     cat "${WORKSPACE}/ip_list.txt"
                     '''
 
+                archiveArtifacts artifacts: 'ip_list.txt', fingerprint: true
+
             }
 }
     }

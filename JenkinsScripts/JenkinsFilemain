@@ -1,0 +1,72 @@
+pipeline{
+    agent any
+    parameters{
+        choice(name: 'NameSpace', choices: ['srh', 'csk', 'rcb'], description: 'Enter the name space')
+        choice(name: 'Environment', choices: ['dev', 'qa', 'prod'], description: 'Select the environment')
+        choice(name: 'Module', choices: ['db', 'app', 'api'], description: 'Select the module')
+        choice(name: 'TerraformOperation', choices: ['init', 'plan', 'apply'], description: 'Select the terraform operation')
+        choice(name: 'TopologyBranch', choices: ['main', 'develop', 'feature'], description: 'Select the git branch')
+        choice(name: 'ModuleBranch', choices: ['main', 'develop', 'feature'], description: 'Select the git branch')
+        choice(name: 'UtilityBranch', choices: ['main', 'develop', 'feature'], description: 'Select the git branch')
+    }
+    stages{
+        stage('AWS CLI Check - Existing Nodes'){
+            steps{
+                build job: 'JenkinsFileone', wait: true, propagate: true, parameters: [
+                    choice(name: 'NameSpace', value: params.NameSpace),
+                    choice(name: 'Environment', value: params.Environment),
+                    choice(name: 'Module', value: params.Module),
+                    choice(name: 'TerraformOperation', value: params.TerraformOperation),
+                    choice(name: 'TopologyBranch', value: params.TopologyBranch),
+                    choice(name: 'ModuleBranch', value: params.ModuleBranch)
+                ]
+                copyArtifacts projectName: 'JenkinsFileone', selector: lastSuccessful(), fingerprintArtifacts: true
+                script {
+                    env.IP_LIST = readFile('ip_list.txt').trim()
+                    echo "Parsed IP list from JenkinsFileone:\n${env.IP_LIST}"
+                }
+            }
+        }
+        stage('Ansible Config Refresh'){
+            steps{
+                build job: 'JenkinsFiletwo', wait: true, propagate: true, parameters: [
+                    choice(name: 'NameSpace', value: params.NameSpace),
+                    choice(name: 'Environment', value: params.Environment),
+                    choice(name: 'Module', value: params.Module),
+                    choice(name: 'TerraformOperation', value: params.TerraformOperation),
+                    choice(name: 'TopologyBranch', value: params.TopologyBranch),
+                    choice(name: 'ModuleBranch', value: params.ModuleBranch),
+                    string(name: 'HostList', value: env.IP_LIST)
+                ]
+            }
+        }
+        stage('Validate New Nodes'){
+            steps{
+                build job: 'JenkinsFilethree', wait: true, propagate: true, parameters: [
+                    choice(name: 'NameSpace', value: params.NameSpace),
+                    choice(name: 'Environment', value: params.Environment),
+                    choice(name: 'Module', value: params.Module),
+                    choice(name: 'TerraformOperation', value: params.TerraformOperation),
+                    choice(name: 'TopologyBranch', value: params.TopologyBranch),
+                    choice(name: 'ModuleBranch', value: params.ModuleBranch),
+                    choice(name: 'UtilityBranch', value: params.UtilityBranch),
+                    string(name: 'RackList', value: env.IP_LIST)
+                ]
+            }
+        }
+        stage('Check DSE Status'){
+            steps{
+                build job: 'JenkinsFilefour', wait: true, propagate: true, parameters: [
+                    choice(name: 'NameSpace', value: params.NameSpace),
+                    choice(name: 'Environment', value: params.Environment),
+                    choice(name: 'Module', value: params.Module),
+                    choice(name: 'TerraformOperation', value: params.TerraformOperation),
+                    choice(name: 'TopologyBranch', value: params.TopologyBranch),
+                    choice(name: 'ModuleBranch', value: params.ModuleBranch),
+                    choice(name: 'UtilityBranch', value: params.UtilityBranch),
+                    string(name: 'HostList', value: env.IP_LIST)
+                ]
+            }
+        }
+    }
+}
