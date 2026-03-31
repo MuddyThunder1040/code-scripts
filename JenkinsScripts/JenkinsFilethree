@@ -8,7 +8,7 @@ pipeline{
         choice(name: 'TopologyBranch', choices: ['main', 'develop', 'feature'], description: 'Select the git branch')
         choice(name: 'ModuleBranch', choices: ['main', 'develop', 'feature'], description: 'Select the git branch')
         choice(name: 'UtilityBranch', choices: ['main', 'develop', 'feature'], description: 'Select the git branch')
-        string(name: 'RackList', defaultValue: '', description: 'Enter the rack list')
+        string(name: 'RackList', defaultValue: '', description: 'Enter the new IP list (existing + new nodes)')
     }
     stages{
         stage("Validate new nodes Printing Parameters"){
@@ -21,7 +21,7 @@ pipeline{
                 echo "Topology Branch: ${params.TopologyBranch}"
                 echo "Module Branch: ${params.ModuleBranch}"
                 echo "Utility Branch: ${params.UtilityBranch}"
-                echo "Host List: ${params.HostList}"
+                echo "Rack List: ${params.RackList}"
             }
         }
     }

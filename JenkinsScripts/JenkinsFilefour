@@ -8,7 +8,7 @@ pipeline{
         choice(name: 'TopologyBranch', choices: ['main', 'develop', 'feature'], description: 'Select the git branch')
         choice(name: 'ModuleBranch', choices: ['main', 'develop', 'feature'], description: 'Select the git branch')
         choice(name: 'UtilityBranch', choices: ['main', 'develop', 'feature'], description: 'Select the git branch')
-        string(name: 'HostList', defaultValue: '', description: 'Enter the host list')
+        string(name: 'HostList', defaultValue: '', description: 'Enter the new IP list (existing + new nodes)')
     }
     stages{
         stage("Check DSE status Printing Parameters"){

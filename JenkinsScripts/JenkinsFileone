@@ -48,20 +48,32 @@ pipeline{
                     echo "IP list creation and addition to workspace completed for ${params.NameSpace} in ${params.Environment} environment for ${params.Module} module."
 
                     sh '''
-                    # Generate a random sample size between 5 and 40
+                    # Generate a random sample size between 5 and 40 for existing nodes
                     count=$((RANDOM % 36 + 5))
                     echo "Generating ${count} random IP addresses into ${WORKSPACE}/ip_list.txt"
-                    
-                    # Create random IPv4 addresses under 1.0.0.0 - 223.255.255.255
+
+                    # Create random IPv4 addresses for existing nodes
                     for i in $(seq 1 "$count"); do
                       echo "$((RANDOM % 223 + 1)).$((RANDOM % 256)).$((RANDOM % 256)).$((RANDOM % 256))"
                     done > "${WORKSPACE}/ip_list.txt"
-                    
+
                     echo "Generated IP list:"
                     cat "${WORKSPACE}/ip_list.txt"
+
+                    # Generate a random number of new nodes (1 to 5) and append to create new_ip_list.txt
+                    new_count=$((RANDOM % 5 + 1))
+                    echo "Adding ${new_count} new IP addresses into ${WORKSPACE}/new_ip_list.txt"
+
+                    cp "${WORKSPACE}/ip_list.txt" "${WORKSPACE}/new_ip_list.txt"
+                    for i in $(seq 1 "$new_count"); do
+                      echo "$((RANDOM % 223 + 1)).$((RANDOM % 256)).$((RANDOM % 256)).$((RANDOM % 256))"
+                    done >> "${WORKSPACE}/new_ip_list.txt"
+
+                    echo "Generated new IP list (existing + new nodes):"
+                    cat "${WORKSPACE}/new_ip_list.txt"
                     '''
 
-                archiveArtifacts artifacts: 'ip_list.txt', fingerprint: true
+                archiveArtifacts artifacts: 'ip_list.txt, new_ip_list.txt', fingerprint: true
 
             }
 }

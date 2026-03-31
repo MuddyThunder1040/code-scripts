@@ -20,10 +20,13 @@ pipeline{
                     string(name: 'TopologyBranch', value: params.TopologyBranch),
                     string(name: 'ModuleBranch', value: params.ModuleBranch)
                 ]
-                copyArtifacts projectName: "expansion-pipeline/one-pipeline/${env.BRANCH_NAME}", fingerprintArtifacts: true
                 script {
+                    sh "curl -fsSL '${env.JENKINS_URL}job/expansion-pipeline/job/one-pipeline/job/${env.BRANCH_NAME}/lastSuccessfulBuild/artifact/ip_list.txt' -o '${env.WORKSPACE}/ip_list.txt'"
+                    sh "curl -fsSL '${env.JENKINS_URL}job/expansion-pipeline/job/one-pipeline/job/${env.BRANCH_NAME}/lastSuccessfulBuild/artifact/new_ip_list.txt' -o '${env.WORKSPACE}/new_ip_list.txt'"
                     env.IP_LIST = readFile('ip_list.txt').trim()
+                    env.NEW_IP_LIST = readFile('new_ip_list.txt').trim()
                     echo "Parsed IP list from JenkinsFileone:\n${env.IP_LIST}"
+                    echo "Parsed new IP list from JenkinsFileone:\n${env.NEW_IP_LIST}"
                 }
             }
         }
@@ -50,7 +53,7 @@ pipeline{
                     string(name: 'TopologyBranch', value: params.TopologyBranch),
                     string(name: 'ModuleBranch', value: params.ModuleBranch),
                     string(name: 'UtilityBranch', value: params.UtilityBranch),
-                    string(name: 'RackList', value: env.IP_LIST)
+                    string(name: 'RackList', value: env.NEW_IP_LIST)
                 ]
             }
         }
@@ -64,7 +67,7 @@ pipeline{
                     string(name: 'TopologyBranch', value: params.TopologyBranch),
                     string(name: 'ModuleBranch', value: params.ModuleBranch),
                     string(name: 'UtilityBranch', value: params.UtilityBranch),
-                    string(name: 'HostList', value: env.IP_LIST)
+                    string(name: 'HostList', value: env.NEW_IP_LIST)
                 ]
             }
         }
