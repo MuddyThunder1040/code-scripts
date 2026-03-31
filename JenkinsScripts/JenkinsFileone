@@ -9,7 +9,7 @@ pipeline{
         choice(name: 'utilityBranch', choices: ['main', 'develop', 'feature'], description: 'Select the git branch')
     }
     stages{
-        stage('Executing AWS CLI Commands'){
+        stage('Executing AWS CLI to check existing nodes'){
             steps{
 
                 echo "========= Executing AWS CLI commands for ${params.NameSpace} in ${params.Environment} environment for ${params.Module} module . ========="
@@ -28,7 +28,7 @@ pipeline{
     
             }
         }
-            stage('Executing AWS CLI Commands'){
+            stage('Executing AWS CLI to check new nodes'){
                 steps{
 
                     echo "========= Executing AWS CLI commands for ${params.NameSpace} in ${params.Environment} environment for ${params.Module} module . ========="
