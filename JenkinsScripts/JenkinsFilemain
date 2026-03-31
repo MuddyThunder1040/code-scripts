@@ -70,42 +70,38 @@ pipeline{
                 }
             }
         }
-        stage('Validate and Check DSE'){
-            parallel{
-                stage('Validate New Nodes'){
-                    steps{
-                        retry(2){
-                            timeout(time: 30, unit: 'MINUTES'){
-                                build job: env.THREE_PIPELINE, wait: true, propagate: true, parameters: [
-                                    string(name: 'NameSpace', value: params.NameSpace),
-                                    string(name: 'Environment', value: params.Environment),
-                                    string(name: 'Module', value: params.Module),
-                                    string(name: 'TerraformOperation', value: params.TerraformOperation),
-                                    string(name: 'TopologyBranch', value: params.TopologyBranch),
-                                    string(name: 'ModuleBranch', value: params.ModuleBranch),
-                                    string(name: 'UtilityBranch', value: params.UtilityBranch),
-                                    string(name: 'RackList', value: env.NEW_IP_LIST)
-                                ]
-                            }
-                        }
+        stage('Validate New Nodes'){
+            steps{
+                retry(2){
+                    timeout(time: 30, unit: 'MINUTES'){
+                        build job: env.THREE_PIPELINE, wait: true, propagate: true, parameters: [
+                            string(name: 'NameSpace', value: params.NameSpace),
+                            string(name: 'Environment', value: params.Environment),
+                            string(name: 'Module', value: params.Module),
+                            string(name: 'TerraformOperation', value: params.TerraformOperation),
+                            string(name: 'TopologyBranch', value: params.TopologyBranch),
+                            string(name: 'ModuleBranch', value: params.ModuleBranch),
+                            string(name: 'UtilityBranch', value: params.UtilityBranch),
+                            string(name: 'RackList', value: env.NEW_IP_LIST)
+                        ]
                     }
                 }
-                stage('Check DSE Status'){
-                    steps{
-                        retry(2){
-                            timeout(time: 30, unit: 'MINUTES'){
-                                build job: env.FOUR_PIPELINE, wait: true, propagate: true, parameters: [
-                                    string(name: 'NameSpace', value: params.NameSpace),
-                                    string(name: 'Environment', value: params.Environment),
-                                    string(name: 'Module', value: params.Module),
-                                    string(name: 'TerraformOperation', value: params.TerraformOperation),
-                                    string(name: 'TopologyBranch', value: params.TopologyBranch),
-                                    string(name: 'ModuleBranch', value: params.ModuleBranch),
-                                    string(name: 'UtilityBranch', value: params.UtilityBranch),
-                                    string(name: 'HostList', value: env.NEW_IP_LIST)
-                                ]
-                            }
-                        }
+            }
+        }
+        stage('Check DSE Status'){
+            steps{
+                retry(2){
+                    timeout(time: 30, unit: 'MINUTES'){
+                        build job: env.FOUR_PIPELINE, wait: true, propagate: true, parameters: [
+                            string(name: 'NameSpace', value: params.NameSpace),
+                            string(name: 'Environment', value: params.Environment),
+                            string(name: 'Module', value: params.Module),
+                            string(name: 'TerraformOperation', value: params.TerraformOperation),
+                            string(name: 'TopologyBranch', value: params.TopologyBranch),
+                            string(name: 'ModuleBranch', value: params.ModuleBranch),
+                            string(name: 'UtilityBranch', value: params.UtilityBranch),
+                            string(name: 'HostList', value: env.NEW_IP_LIST)
+                        ]
                     }
                 }
             }
