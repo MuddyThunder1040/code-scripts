@@ -1,0 +1,52 @@
+name: AI PR Review (Real)
+
+on:
+  pull_request:
+    types: [opened, synchronize]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  review:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install GitHub CLI
+        run: sudo apt-get update && sudo apt-get install -y gh
+
+      - name: Get PR Diff
+        run: |
+          gh pr diff ${{ github.event.pull_request.number }} > pr.diff
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Run AI Review
+        run: |
+          RESPONSE=$(curl https://api.openai.com/v1/responses \
+            -H "Authorization: Bearer $OPENAI_API_KEY" \
+            -H "Content-Type: application/json" \
+            -d '{
+              "model": "gpt-4.1",
+              "input": "Review this PR diff and provide structured feedback with sections: Good, Issues, Security, Suggestions:\n'"$(cat pr.diff | head -c 12000)"'"
+            }')
+
+          echo "$RESPONSE" > review.txt
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+
+      - name: Extract Text
+        run: |
+          sudo apt-get install -y jq
+          cat review.txt | jq -r '.output[0].content[0].text' > final_review.txt
+
+      - name: Comment on PR
+        run: |
+          gh pr comment ${{ github.event.pull_request.number }} \
+            --body "$(cat final_review.txt)"
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
