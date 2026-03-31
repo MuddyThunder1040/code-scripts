@@ -22,13 +22,6 @@ pipeline{
 
         }
             stage('Executing Terraform Commands'){
-                when{
-                    expression { params.TerraformOperation == 'apply' }
-                }
-                input{
-                    message "Approve Terraform 'apply' operation for ${params.NameSpace} in ${params.Environment} (${params.Module})?"
-                    ok "Approve"
-                }
                 steps{
 
                     echo "========= Executing Terraform commands for ${params.NameSpace} in ${params.Environment} environment for ${params.Module} module with ${params.TerraformOperation} operation. ========="

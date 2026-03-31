@@ -10,6 +10,14 @@ pipeline{
         choice(name: 'UtilityBranch', choices: ['main', 'develop', 'feature'], description: 'Select the git branch')
     }
     stages{
+        stage('Approve Terraform Apply'){
+            when{
+                expression { params.TerraformOperation == 'apply' }
+            }
+            steps{
+                input message: "Approve Terraform 'apply' operation for ${params.NameSpace} in ${params.Environment} (${params.Module})?", ok: "Approve"
+            }
+        }
         stage('AWS CLI Check - Existing Nodes'){
             steps{
                 build job: "expansion-pipeline/one-pipeline/${env.BRANCH_NAME}", wait: true, propagate: true, parameters: [
