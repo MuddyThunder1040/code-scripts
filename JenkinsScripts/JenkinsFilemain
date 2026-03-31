@@ -9,76 +9,105 @@ pipeline{
         choice(name: 'ModuleBranch', choices: ['main', 'develop', 'feature'], description: 'Select the git branch')
         choice(name: 'UtilityBranch', choices: ['main', 'develop', 'feature'], description: 'Select the git branch')
     }
+    environment {
+        ONE_PIPELINE   = "expansion-pipeline/one-pipeline/${env.BRANCH_NAME}"
+        TWO_PIPELINE   = "expansion-pipeline/two-pipeline/${env.BRANCH_NAME}"
+        THREE_PIPELINE = "expansion-pipeline/three-pipeline/${env.BRANCH_NAME}"
+        FOUR_PIPELINE  = "expansion-pipeline/four-pipeline/${env.BRANCH_NAME}"
+    }
     stages{
         stage('Approve Terraform Apply'){
             when{
                 expression { params.TerraformOperation == 'apply' }
             }
             steps{
-                input message: "Approve Terraform 'apply' operation for ${params.NameSpace} in ${params.Environment} (${params.Module})?", ok: "Approve"
+                timeout(time: 10, unit: 'MINUTES'){
+                    input message: "Approve Terraform 'apply' operation for ${params.NameSpace} in ${params.Environment} (${params.Module})?", ok: "Approve"
+                }
             }
         }
         stage('AWS CLI Check - Existing Nodes'){
             steps{
-                build job: "expansion-pipeline/one-pipeline/${env.BRANCH_NAME}", wait: true, propagate: true, parameters: [
-                    string(name: 'NameSpace', value: params.NameSpace),
-                    string(name: 'Environment', value: params.Environment),
-                    string(name: 'Module', value: params.Module),
-                    string(name: 'TerraformOperation', value: params.TerraformOperation),
-                    string(name: 'TopologyBranch', value: params.TopologyBranch),
-                    string(name: 'ModuleBranch', value: params.ModuleBranch)
-                ]
-                copyArtifacts projectName: "expansion-pipeline/one-pipeline/${env.BRANCH_NAME}", filter: 'ip_list.txt, new_ip_list.txt', fingerprintArtifacts: true
                 script {
-                    env.IP_LIST = readFile('ip_list.txt').trim()
+                    def build1
+                    retry(2){
+                        timeout(time: 30, unit: 'MINUTES'){
+                            build1 = build job: env.ONE_PIPELINE, wait: true, propagate: true, parameters: [
+                                string(name: 'NameSpace', value: params.NameSpace),
+                                string(name: 'Environment', value: params.Environment),
+                                string(name: 'Module', value: params.Module),
+                                string(name: 'TerraformOperation', value: params.TerraformOperation),
+                                string(name: 'TopologyBranch', value: params.TopologyBranch),
+                                string(name: 'ModuleBranch', value: params.ModuleBranch)
+                            ]
+                        }
+                    }
+                    echo "Using artifacts from one-pipeline build #${build1.number}"
+                    copyArtifacts projectName: env.ONE_PIPELINE, selector: specific("${build1.number}"), filter: 'ip_list.txt, new_ip_list.txt', fingerprintArtifacts: true
+                    if (!fileExists('ip_list.txt'))     { error "Missing required artifact: ip_list.txt" }
+                    if (!fileExists('new_ip_list.txt')) { error "Missing required artifact: new_ip_list.txt" }
+                    env.IP_LIST     = readFile('ip_list.txt').trim()
                     env.NEW_IP_LIST = readFile('new_ip_list.txt').trim()
-                    echo "Parsed IP list from JenkinsFileone:\n${env.IP_LIST}"
-                    echo "Parsed new IP list from JenkinsFileone:\n${env.NEW_IP_LIST}"
+                    echo "Parsed IP list:\n${env.IP_LIST}"
+                    echo "Parsed new IP list:\n${env.NEW_IP_LIST}"
                 }
             }
         }
-        
-
-
         stage('Ansible Config Refresh'){
             steps{
-                build job: "expansion-pipeline/two-pipeline/${env.BRANCH_NAME}", wait: true, propagate: true, parameters: [
-                    string(name: 'NameSpace', value: params.NameSpace),
-                    string(name: 'Environment', value: params.Environment),
-                    string(name: 'Module', value: params.Module),
-                    string(name: 'TerraformOperation', value: params.TerraformOperation),
-                    string(name: 'TopologyBranch', value: params.TopologyBranch),
-                    string(name: 'ModuleBranch', value: params.ModuleBranch),
-                    string(name: 'HostList', value: env.IP_LIST)
-                ]
+                retry(2){
+                    timeout(time: 30, unit: 'MINUTES'){
+                        build job: env.TWO_PIPELINE, wait: true, propagate: true, parameters: [
+                            string(name: 'NameSpace', value: params.NameSpace),
+                            string(name: 'Environment', value: params.Environment),
+                            string(name: 'Module', value: params.Module),
+                            string(name: 'TerraformOperation', value: params.TerraformOperation),
+                            string(name: 'TopologyBranch', value: params.TopologyBranch),
+                            string(name: 'ModuleBranch', value: params.ModuleBranch),
+                            string(name: 'HostList', value: env.IP_LIST)
+                        ]
+                    }
+                }
             }
         }
-        stage('Validate New Nodes'){
-            steps{
-                build job: "expansion-pipeline/three-pipeline/${env.BRANCH_NAME}", wait: true, propagate: true, parameters: [
-                    string(name: 'NameSpace', value: params.NameSpace),
-                    string(name: 'Environment', value: params.Environment),
-                    string(name: 'Module', value: params.Module),
-                    string(name: 'TerraformOperation', value: params.TerraformOperation),
-                    string(name: 'TopologyBranch', value: params.TopologyBranch),
-                    string(name: 'ModuleBranch', value: params.ModuleBranch),
-                    string(name: 'UtilityBranch', value: params.UtilityBranch),
-                    string(name: 'RackList', value: env.NEW_IP_LIST)
-                ]
-            }
-        }
-        stage('Check DSE Status'){
-            steps{
-                build job: "expansion-pipeline/four-pipeline/${env.BRANCH_NAME}", wait: true, propagate: true, parameters: [
-                    string(name: 'NameSpace', value: params.NameSpace),
-                    string(name: 'Environment', value: params.Environment),
-                    string(name: 'Module', value: params.Module),
-                    string(name: 'TerraformOperation', value: params.TerraformOperation),
-                    string(name: 'TopologyBranch', value: params.TopologyBranch),
-                    string(name: 'ModuleBranch', value: params.ModuleBranch),
-                    string(name: 'UtilityBranch', value: params.UtilityBranch),
-                    string(name: 'HostList', value: env.NEW_IP_LIST)
-                ]
+        stage('Validate and Check DSE'){
+            parallel{
+                stage('Validate New Nodes'){
+                    steps{
+                        retry(2){
+                            timeout(time: 30, unit: 'MINUTES'){
+                                build job: env.THREE_PIPELINE, wait: true, propagate: true, parameters: [
+                                    string(name: 'NameSpace', value: params.NameSpace),
+                                    string(name: 'Environment', value: params.Environment),
+                                    string(name: 'Module', value: params.Module),
+                                    string(name: 'TerraformOperation', value: params.TerraformOperation),
+                                    string(name: 'TopologyBranch', value: params.TopologyBranch),
+                                    string(name: 'ModuleBranch', value: params.ModuleBranch),
+                                    string(name: 'UtilityBranch', value: params.UtilityBranch),
+                                    string(name: 'RackList', value: env.NEW_IP_LIST)
+                                ]
+                            }
+                        }
+                    }
+                }
+                stage('Check DSE Status'){
+                    steps{
+                        retry(2){
+                            timeout(time: 30, unit: 'MINUTES'){
+                                build job: env.FOUR_PIPELINE, wait: true, propagate: true, parameters: [
+                                    string(name: 'NameSpace', value: params.NameSpace),
+                                    string(name: 'Environment', value: params.Environment),
+                                    string(name: 'Module', value: params.Module),
+                                    string(name: 'TerraformOperation', value: params.TerraformOperation),
+                                    string(name: 'TopologyBranch', value: params.TopologyBranch),
+                                    string(name: 'ModuleBranch', value: params.ModuleBranch),
+                                    string(name: 'UtilityBranch', value: params.UtilityBranch),
+                                    string(name: 'HostList', value: env.NEW_IP_LIST)
+                                ]
+                            }
+                        }
+                    }
+                }
             }
         }
     }
