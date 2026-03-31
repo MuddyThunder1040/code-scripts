@@ -20,7 +20,7 @@ pipeline{
                     string(name: 'TopologyBranch', value: params.TopologyBranch),
                     string(name: 'ModuleBranch', value: params.ModuleBranch)
                 ]
-                copyArtifacts projectName: "expansion-pipeline/one-pipeline/${env.BRANCH_NAME}", selector: lastSuccessful(), fingerprintArtifacts: true
+                copyArtifacts projectName: "expansion-pipeline/one-pipeline/${env.BRANCH_NAME}", fingerprintArtifacts: true
                 script {
                     env.IP_LIST = readFile('ip_list.txt').trim()
                     echo "Parsed IP list from JenkinsFileone:\n${env.IP_LIST}"
