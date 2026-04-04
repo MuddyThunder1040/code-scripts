@@ -92,6 +92,13 @@ resource "time_sleep" "after_seed_bootstrap" {
 }
 
 
+resource "time_sleep" "node_startup_delay" {
+  count = var.non_seed_node_count
+
+  depends_on      = [time_sleep.after_seed_bootstrap]
+  create_duration = "${45 * (count.index + 1)}s"
+}
+
 resource "docker_container" "cassandra_nodes" {
   count = var.non_seed_node_count
 
@@ -118,8 +125,7 @@ resource "docker_container" "cassandra_nodes" {
     "CASSANDRA_CLUSTER_NAME=MyCassandraCluster",
     "CASSANDRA_SEEDS=cassandra-seed-node",
     "MAX_HEAP_SIZE=1G",
-    "HEAP_NEWSIZE=256M",
-    "BOOTSTRAP_DEPENDENCY=${count.index == 0 ? time_sleep.after_seed_bootstrap.id : time_sleep.after_node_bootstrap[count.index - 1].id}"
+    "HEAP_NEWSIZE=256M"
   ]
 
   # 🌐 Unique ports per node
@@ -136,15 +142,6 @@ resource "docker_container" "cassandra_nodes" {
   }
 
   depends_on = [
-    docker_container.cassandra_seed_node
+    time_sleep.node_startup_delay[count.index]
   ]
-}
-
-resource "time_sleep" "after_node_bootstrap" {
-  count = var.non_seed_node_count
-
-  create_duration = "45s"
-  triggers = {
-    node_id = docker_container.cassandra_nodes[count.index].id
-  }
 }
