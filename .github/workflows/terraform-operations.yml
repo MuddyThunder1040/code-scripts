@@ -28,6 +28,13 @@ jobs:
         with:
           ref: ${{ inputs.branch }}
 
+      - name: Terraform Login
+        run: |
+          mkdir -p ~/.terraform.d
+          echo '{"credentials":{"app.terraform.io":{"token":"'"$TF_API_TOKEN"'"}}}' > ~/.terraform.d/credentials.tfrc.json
+        env:
+          TF_API_TOKEN: ${{ secrets.TF_API_TOKEN }}
+
       - name: Terraform init
         working-directory: ${{ inputs.module }}
         run: terraform init
