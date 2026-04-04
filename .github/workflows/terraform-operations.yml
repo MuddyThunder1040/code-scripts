@@ -16,7 +16,7 @@ on:
         description: 'Terraform action'
         required: true
         type: choice
-        options: [plan, apply, show, destroy, validate]
+        options: [plan, apply, show, destroy, validate, init]
 
 jobs:
   terraform:
