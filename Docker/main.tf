@@ -125,7 +125,8 @@ resource "docker_container" "cassandra_nodes" {
     "CASSANDRA_CLUSTER_NAME=MyCassandraCluster",
     "CASSANDRA_SEEDS=cassandra-seed-node",
     "MAX_HEAP_SIZE=1G",
-    "HEAP_NEWSIZE=256M"
+    "HEAP_NEWSIZE=256M",
+    "STARTUP_ORDER=${time_sleep.node_startup_delay[count.index].id}"
   ]
 
   # 🌐 Unique ports per node
@@ -140,8 +141,4 @@ resource "docker_container" "cassandra_nodes" {
     soft = 100000
     hard = 100000
   }
-
-  depends_on = [
-    time_sleep.node_startup_delay[count.index]
-  ]
 }
