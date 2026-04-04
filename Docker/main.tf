@@ -4,6 +4,10 @@ terraform {
       source  = "kreuzwerker/docker"
       version = "~> 3.0"
     }
+    time = {
+      source  = "hashicorp/time"
+      version = "~> 0.11"
+    }
   }
       cloud {
     organization = "oiasis-org"
@@ -15,6 +19,8 @@ terraform {
 }
 
 provider "docker" {}
+
+provider "time" {}
 
 
 resource "docker_network" "cassandra_network" {
@@ -78,6 +84,14 @@ resource "docker_container" "cassandra_seed_node" {
   }
 }
 
+resource "time_sleep" "after_seed_bootstrap" {
+  create_duration = "45s"
+
+  depends_on = [
+    docker_container.cassandra_seed_node
+  ]
+}
+
 
 resource "docker_container" "cassandra_nodes" {
   count = var.non_seed_node_count
@@ -105,7 +119,8 @@ resource "docker_container" "cassandra_nodes" {
     "CASSANDRA_CLUSTER_NAME=MyCassandraCluster",
     "CASSANDRA_SEEDS=cassandra-seed-node",
     "MAX_HEAP_SIZE=1G",
-    "HEAP_NEWSIZE=256M"
+    "HEAP_NEWSIZE=256M",
+    "BOOTSTRAP_DEPENDENCY=${count.index == 0 ? time_sleep.after_seed_bootstrap.id : time_sleep.after_node_bootstrap[count.index - 1].id}"
   ]
 
   # 🌐 Unique ports per node
@@ -121,8 +136,17 @@ resource "docker_container" "cassandra_nodes" {
     hard = 100000
   }
 
-  # ⏳ Ensure seed starts first
   depends_on = [
     docker_container.cassandra_seed_node
+  ]
+}
+
+resource "time_sleep" "after_node_bootstrap" {
+  count = var.non_seed_node_count
+
+  create_duration = "45s"
+
+  depends_on = [
+    docker_container.cassandra_nodes[count.index]
   ]
 }
