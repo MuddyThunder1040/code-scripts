@@ -57,13 +57,11 @@ resource "docker_container" "cassandra_seed_node" {
   memory      = 2048
   memory_swap = 2048
 
-  # 💾 Persistent storage
   volumes {
     volume_name    = docker_volume.cassandra_seed_data.name
     container_path = "/var/lib/cassandra"
   }
 
-  # 🧠 Cassandra config
   env = [
     "CASSANDRA_CLUSTER_NAME=MyCassandraCluster",
     "CASSANDRA_SEEDS=cassandra-seed-node",
