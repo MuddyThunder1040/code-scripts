@@ -17,11 +17,6 @@ terraform {
 provider "docker" {}
 
 
-variable "cas_network" {
-  default = "cassandra_network"
-}
-
-
 resource "docker_network" "cassandra_network" {
   name = var.cas_network
 }
