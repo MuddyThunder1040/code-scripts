@@ -16,7 +16,7 @@ on:
         description: 'Terraform action'
         required: true
         type: choice
-        options: [plan, apply, show, destroy, validate]
+        options: [plan, apply, show, destroy, validate, init]
 
 jobs:
   terraform:
@@ -28,15 +28,23 @@ jobs:
         with:
           ref: ${{ inputs.branch }}
 
+      - name: Terraform Login
+        run: |
+          mkdir -p ~/.terraform.d
+          echo '{"credentials":{"app.terraform.io":{"token":"'"$TF_API_TOKEN"'"}}}' > ~/.terraform.d/credentials.tfrc.json
+        env:
+          TF_API_TOKEN: ${{ secrets.TF_API_TOKEN }}
+
       - name: Terraform init
         working-directory: ${{ inputs.module }}
         run: terraform init
 
-      - name: Clean up Docker container (if needed)
+      - name: Clean up Docker resources (if needed)
         if: inputs.action == 'apply' && inputs.module == 'Docker'
         run: |
-          docker ps -a --filter "name=nginx" --quiet | xargs -r docker rm -f
-          echo "Cleaned up conflicting nginx containers"
+          docker ps -a --filter "name=cassandra" --quiet | xargs -r docker rm -f
+          docker network ls --filter "name=cassandra-network" --quiet | xargs -r docker network rm
+          echo "Cleaned up conflicting Cassandra containers and networks"
 
       - name: Terraform ${{ inputs.action }}
         working-directory: ${{ inputs.module }}
