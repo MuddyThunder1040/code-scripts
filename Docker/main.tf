@@ -86,10 +86,9 @@ resource "docker_container" "cassandra_seed_node" {
 
 resource "time_sleep" "after_seed_bootstrap" {
   create_duration = "45s"
-
-  depends_on = [
-    docker_container.cassandra_seed_node
-  ]
+  triggers = {
+    seed_id = docker_container.cassandra_seed_node.id
+  }
 }
 
 
@@ -145,8 +144,7 @@ resource "time_sleep" "after_node_bootstrap" {
   count = var.non_seed_node_count
 
   create_duration = "45s"
-
-  depends_on = [
-    docker_container.cassandra_nodes[count.index]
-  ]
+  triggers = {
+    node_id = docker_container.cassandra_nodes[count.index].id
+  }
 }
