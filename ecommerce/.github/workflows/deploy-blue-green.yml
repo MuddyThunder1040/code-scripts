@@ -1,0 +1,434 @@
+name: Deploy Blue-Green
+
+on:
+  workflow_dispatch:
+    inputs:
+      target_color:
+        description: "Deployment colour to deploy to"
+        required: true
+        type: choice
+        options:
+          - blue
+          - green
+      version_tag:
+        description: "Docker image version tag (e.g. 1.2.0 or git SHA)"
+        required: true
+        type: string
+      environment:
+        description: "Target environment"
+        required: true
+        type: choice
+        options:
+          - staging
+          - production
+      run_smoke_tests:
+        description: "Run smoke tests before switching traffic"
+        required: false
+        type: boolean
+        default: true
+
+env:
+  SERVICES: "user-service product-service order-service cart-service"
+
+jobs:
+  # ============================================================
+  # Job 1: Validate input — target colour must differ from active
+  # ============================================================
+  validate:
+    name: Validate Deployment
+    runs-on: ubuntu-latest
+    outputs:
+      current_color: ${{ steps.get-current.outputs.current_color }}
+      namespace: ${{ steps.get-current.outputs.namespace }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure kubectl
+        uses: azure/setup-kubectl@v3
+        with:
+          version: "latest"
+
+      - name: Set kubeconfig
+        run: |
+          mkdir -p ~/.kube
+          echo "${{ secrets.KUBECONFIG }}" | base64 -d > ~/.kube/config
+          chmod 600 ~/.kube/config
+        env:
+          KUBECONFIG_B64: ${{ secrets.KUBECONFIG }}
+
+      - name: Get current active colour
+        id: get-current
+        run: |
+          CURRENT=$(kubectl get service production-router -n ecommerce \
+            -o jsonpath='{.spec.selector.color}' 2>/dev/null || echo "blue")
+          echo "current_color=${CURRENT}" >> "$GITHUB_OUTPUT"
+
+          if [[ "${{ inputs.target_color }}" == "blue" ]]; then
+            echo "namespace=ecommerce-blue" >> "$GITHUB_OUTPUT"
+          else
+            echo "namespace=ecommerce-green" >> "$GITHUB_OUTPUT"
+          fi
+
+          echo "Current active colour: ${CURRENT}"
+          echo "Target colour: ${{ inputs.target_color }}"
+
+      - name: Validate colour differs
+        run: |
+          CURRENT="${{ steps.get-current.outputs.current_color }}"
+          TARGET="${{ inputs.target_color }}"
+          if [[ "$CURRENT" == "$TARGET" ]]; then
+            echo "::error::Target colour '${TARGET}' is already the active deployment!"
+            echo "::error::Switch to the other colour first or use rollback instead."
+            exit 1
+          fi
+          echo "Validation passed: ${CURRENT} → ${TARGET}"
+
+      - name: Validate version tag
+        run: |
+          VERSION="${{ inputs.version_tag }}"
+          if [[ -z "$VERSION" ]]; then
+            echo "::error::version_tag cannot be empty"
+            exit 1
+          fi
+          echo "Deploying version: ${VERSION}"
+
+  # ============================================================
+  # Job 2: Deploy to target colour namespace
+  # ============================================================
+  deploy:
+    name: Deploy to ${{ inputs.target_color }}
+    runs-on: ubuntu-latest
+    needs: validate
+    environment: ${{ inputs.environment }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure kubectl
+        uses: azure/setup-kubectl@v3
+
+      - name: Set kubeconfig
+        run: |
+          mkdir -p ~/.kube
+          echo "${{ secrets.KUBECONFIG }}" | base64 -d > ~/.kube/config
+          chmod 600 ~/.kube/config
+
+      - name: Apply namespace and configmap
+        run: |
+          kubectl apply -f kubernetes/namespace.yaml
+          kubectl apply -f kubernetes/configmap.yaml
+          kubectl apply -f kubernetes/secret.yaml
+        working-directory: ${{ github.workspace }}/ecommerce
+
+      - name: Apply target deployment manifests
+        run: |
+          kubectl apply -f kubernetes/blue-green/${{ inputs.target_color }}-deployment.yaml
+        working-directory: ${{ github.workspace }}/ecommerce
+
+      - name: Update image tags for all services
+        run: |
+          NAMESPACE="${{ needs.validate.outputs.namespace }}"
+          VERSION="${{ inputs.version_tag }}"
+          REGISTRY="${{ vars.REGISTRY || 'your-registry' }}"
+
+          for svc in user-service product-service order-service cart-service; do
+            DEPLOY_NAME="${svc}-${{ inputs.target_color }}"
+            IMAGE="${REGISTRY}/${svc}:${VERSION}"
+            echo "Updating ${DEPLOY_NAME} to image ${IMAGE}"
+            kubectl set image deployment/"${DEPLOY_NAME}" \
+              "${svc}=${IMAGE}" \
+              -n "${NAMESPACE}" || echo "Deployment ${DEPLOY_NAME} not found, skipping"
+          done
+
+      - name: Wait for rollout to complete
+        run: |
+          NAMESPACE="${{ needs.validate.outputs.namespace }}"
+          for svc in user-service product-service order-service cart-service; do
+            DEPLOY_NAME="${svc}-${{ inputs.target_color }}"
+            echo "Waiting for ${DEPLOY_NAME} rollout..."
+            kubectl rollout status deployment/"${DEPLOY_NAME}" \
+              -n "${NAMESPACE}" \
+              --timeout=300s || echo "Warning: ${DEPLOY_NAME} rollout may have issues"
+          done
+
+      - name: Verify pods are ready
+        run: |
+          NAMESPACE="${{ needs.validate.outputs.namespace }}"
+          kubectl wait pod \
+            --for=condition=ready \
+            -l "color=${{ inputs.target_color }}" \
+            -n "${NAMESPACE}" \
+            --timeout=120s
+          echo "All ${{ inputs.target_color }} pods are ready"
+
+  # ============================================================
+  # Job 3: Smoke tests against new deployment
+  # ============================================================
+  smoke-test:
+    name: Smoke Tests (${{ inputs.target_color }})
+    runs-on: ubuntu-latest
+    needs: [validate, deploy]
+    if: ${{ inputs.run_smoke_tests == true }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure kubectl
+        uses: azure/setup-kubectl@v3
+
+      - name: Set kubeconfig
+        run: |
+          mkdir -p ~/.kube
+          echo "${{ secrets.KUBECONFIG }}" | base64 -d > ~/.kube/config
+          chmod 600 ~/.kube/config
+
+      - name: Port-forward services for smoke tests
+        run: |
+          NAMESPACE="${{ needs.validate.outputs.namespace }}"
+          kubectl port-forward service/user-service    18001:8001 -n "${NAMESPACE}" &
+          kubectl port-forward service/product-service 18002:8002 -n "${NAMESPACE}" &
+          kubectl port-forward service/order-service   18003:8003 -n "${NAMESPACE}" &
+          kubectl port-forward service/cart-service    18004:8004 -n "${NAMESPACE}" &
+          sleep 5
+          echo "Port-forwards established"
+
+      - name: Smoke test - User Service health
+        run: |
+          RESP=$(curl -sf http://localhost:18001/health)
+          echo "$RESP"
+          echo "$RESP" | python3 -c "
+          import sys, json; d=json.load(sys.stdin)
+          assert d.get('status') == 'healthy', f'Unhealthy: {d}'
+          assert d.get('version') == '${{ inputs.target_color }}', f'Wrong version: {d}'
+          print('User Service: PASS')
+          "
+
+      - name: Smoke test - Product Service health
+        run: |
+          RESP=$(curl -sf http://localhost:18002/health)
+          echo "$RESP"
+          echo "$RESP" | python3 -c "
+          import sys, json; d=json.load(sys.stdin)
+          assert d.get('status') == 'healthy', f'Unhealthy: {d}'
+          print('Product Service: PASS')
+          "
+
+      - name: Smoke test - Order Service health
+        run: |
+          RESP=$(curl -sf http://localhost:18003/health)
+          echo "$RESP"
+          echo "$RESP" | python3 -c "
+          import sys, json; d=json.load(sys.stdin)
+          assert d.get('status') == 'healthy', f'Unhealthy: {d}'
+          print('Order Service: PASS')
+          "
+
+      - name: Smoke test - Cart Service health
+        run: |
+          RESP=$(curl -sf http://localhost:18004/health)
+          echo "$RESP"
+          echo "$RESP" | python3 -c "
+          import sys, json; d=json.load(sys.stdin)
+          assert d.get('status') == 'healthy', f'Unhealthy: {d}'
+          print('Cart Service: PASS')
+          "
+
+      - name: Smoke test - Create test user
+        id: create-user
+        run: |
+          TS=$(date +%s)
+          RESP=$(curl -sf -X POST http://localhost:18001/users/register \
+            -H 'Content-Type: application/json' \
+            -d "{\"username\":\"smoketest_${TS}\",\"email\":\"smoke_${TS}@test.com\",\"password\":\"smoketest123\"}")
+          echo "$RESP"
+          USER_ID=$(echo "$RESP" | python3 -c "import sys,json; print(json.load(sys.stdin)['id'])")
+          echo "user_id=${USER_ID}" >> "$GITHUB_OUTPUT"
+          echo "Created test user: ID=${USER_ID}"
+
+      - name: Smoke test - List products
+        run: |
+          RESP=$(curl -sf http://localhost:18002/products/)
+          COUNT=$(echo "$RESP" | python3 -c "import sys,json; print(len(json.load(sys.stdin)))")
+          echo "Products available: ${COUNT}"
+          [ "$COUNT" -gt 0 ] || { echo "FAIL: No products found"; exit 1; }
+
+      - name: Smoke test - Add to cart
+        run: |
+          USER_ID="${{ steps.create-user.outputs.user_id }}"
+          RESP=$(curl -sf -X POST "http://localhost:18004/cart/${USER_ID}/items" \
+            -H 'Content-Type: application/json' \
+            -d '{"product_id":1,"quantity":1,"price":99.99,"name":"Smoke Test Product"}')
+          echo "$RESP"
+          ITEM_COUNT=$(echo "$RESP" | python3 -c "import sys,json; print(len(json.load(sys.stdin)['items']))")
+          echo "Cart items: ${ITEM_COUNT}"
+          [ "$ITEM_COUNT" -gt 0 ] || { echo "FAIL: Cart is empty"; exit 1; }
+
+      - name: Smoke test - Create order
+        run: |
+          USER_ID="${{ steps.create-user.outputs.user_id }}"
+          RESP=$(curl -sf -X POST http://localhost:18003/orders/ \
+            -H 'Content-Type: application/json' \
+            -d "{\"user_id\":${USER_ID},\"items\":[{\"product_id\":1,\"quantity\":1,\"price\":99.99}]}")
+          echo "$RESP"
+          ORDER_ID=$(echo "$RESP" | python3 -c "import sys,json; print(json.load(sys.stdin)['id'])")
+          echo "Order created: ID=${ORDER_ID}"
+
+      - name: All smoke tests passed
+        run: echo "All smoke tests passed for ${{ inputs.target_color }} deployment!"
+
+  # ============================================================
+  # Job 4: Switch production traffic to new colour
+  # ============================================================
+  switch-traffic:
+    name: Switch Traffic to ${{ inputs.target_color }}
+    runs-on: ubuntu-latest
+    needs: [validate, deploy, smoke-test]
+    if: always() && needs.deploy.result == 'success' && (needs.smoke-test.result == 'success' || needs.smoke-test.result == 'skipped')
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure kubectl
+        uses: azure/setup-kubectl@v3
+
+      - name: Set kubeconfig
+        run: |
+          mkdir -p ~/.kube
+          echo "${{ secrets.KUBECONFIG }}" | base64 -d > ~/.kube/config
+          chmod 600 ~/.kube/config
+
+      - name: Make switch script executable
+        run: chmod +x scripts/blue-green-switch.sh
+        working-directory: ${{ github.workspace }}/ecommerce
+
+      - name: Switch traffic
+        run: |
+          ./scripts/blue-green-switch.sh "${{ inputs.target_color }}"
+        working-directory: ${{ github.workspace }}/ecommerce
+        env:
+          BASE_URL: ${{ vars.PRODUCTION_BASE_URL || 'http://localhost' }}
+
+      - name: Verify traffic switched
+        run: |
+          ACTIVE=$(kubectl get service production-router -n ecommerce \
+            -o jsonpath='{.spec.selector.color}' 2>/dev/null || echo "unknown")
+          echo "Active colour: ${ACTIVE}"
+          if [[ "$ACTIVE" != "${{ inputs.target_color }}" ]]; then
+            echo "::error::Traffic switch verification failed! Active: ${ACTIVE}, Expected: ${{ inputs.target_color }}"
+            exit 1
+          fi
+          echo "Traffic successfully switched to ${{ inputs.target_color }}"
+
+  # ============================================================
+  # Job 5: Notify on Slack
+  # ============================================================
+  notify:
+    name: Notify
+    runs-on: ubuntu-latest
+    needs: [validate, deploy, smoke-test, switch-traffic]
+    if: always()
+    steps:
+      - name: Determine overall status
+        id: status
+        run: |
+          if [[ "${{ needs.switch-traffic.result }}" == "success" ]]; then
+            echo "overall=success" >> "$GITHUB_OUTPUT"
+            echo "emoji=✅" >> "$GITHUB_OUTPUT"
+            echo "color=#28a745" >> "$GITHUB_OUTPUT"
+            echo "message=Deployment to *${{ inputs.target_color }}* succeeded! Version: ${{ inputs.version_tag }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "overall=failure" >> "$GITHUB_OUTPUT"
+            echo "emoji=❌" >> "$GITHUB_OUTPUT"
+            echo "color=#dc3545" >> "$GITHUB_OUTPUT"
+            echo "message=Deployment to *${{ inputs.target_color }}* FAILED! Version: ${{ inputs.version_tag }}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Send Slack notification
+        if: ${{ secrets.SLACK_WEBHOOK_URL != '' }}
+        uses: slackapi/slack-github-action@v1.25.0
+        with:
+          payload: |
+            {
+              "attachments": [
+                {
+                  "color": "${{ steps.status.outputs.color }}",
+                  "blocks": [
+                    {
+                      "type": "section",
+                      "text": {
+                        "type": "mrkdwn",
+                        "text": "${{ steps.status.outputs.emoji }} *ShopCloud Deployment*\n${{ steps.status.outputs.message }}"
+                      }
+                    },
+                    {
+                      "type": "section",
+                      "fields": [
+                        { "type": "mrkdwn", "text": "*Environment:*\n${{ inputs.environment }}" },
+                        { "type": "mrkdwn", "text": "*Colour:*\n${{ inputs.target_color }}" },
+                        { "type": "mrkdwn", "text": "*Version:*\n${{ inputs.version_tag }}" },
+                        { "type": "mrkdwn", "text": "*Triggered by:*\n${{ github.actor }}" }
+                      ]
+                    },
+                    {
+                      "type": "actions",
+                      "elements": [
+                        {
+                          "type": "button",
+                          "text": { "type": "plain_text", "text": "View Workflow" },
+                          "url": "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          SLACK_WEBHOOK_TYPE: INCOMING_WEBHOOK
+
+  # ============================================================
+  # Job 6: Rollback on failure
+  # ============================================================
+  rollback:
+    name: Rollback to ${{ needs.validate.outputs.current_color }}
+    runs-on: ubuntu-latest
+    needs: [validate, switch-traffic]
+    if: failure() && needs.switch-traffic.result == 'failure'
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure kubectl
+        uses: azure/setup-kubectl@v3
+
+      - name: Set kubeconfig
+        run: |
+          mkdir -p ~/.kube
+          echo "${{ secrets.KUBECONFIG }}" | base64 -d > ~/.kube/config
+          chmod 600 ~/.kube/config
+
+      - name: Make switch script executable
+        run: chmod +x scripts/blue-green-switch.sh
+        working-directory: ${{ github.workspace }}/ecommerce
+
+      - name: Rollback to previous colour
+        run: |
+          PREVIOUS="${{ needs.validate.outputs.current_color }}"
+          echo "Rolling back to: ${PREVIOUS}"
+          ./scripts/blue-green-switch.sh "${PREVIOUS}" || true
+          echo "Rollback to ${PREVIOUS} completed"
+        working-directory: ${{ github.workspace }}/ecommerce
+
+      - name: Notify rollback on Slack
+        if: ${{ secrets.SLACK_WEBHOOK_URL != '' }}
+        uses: slackapi/slack-github-action@v1.25.0
+        with:
+          payload: |
+            {
+              "text": "⚠️ *ShopCloud Rollback* — Deployment to *${{ inputs.target_color }}* failed. Rolled back to *${{ needs.validate.outputs.current_color }}*. <${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|View Workflow>"
+            }
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          SLACK_WEBHOOK_TYPE: INCOMING_WEBHOOK

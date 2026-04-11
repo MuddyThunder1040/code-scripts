@@ -1,0 +1,234 @@
+---
+# Blue Deployment - All services at version v1 (1.0.0 image tags)
+# Namespace: ecommerce-blue
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: user-service-blue
+  namespace: ecommerce-blue
+  labels:
+    app: user-service
+    color: blue
+    version: v1
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: user-service
+      color: blue
+  template:
+    metadata:
+      labels:
+        app: user-service
+        color: blue
+        version: v1
+    spec:
+      containers:
+        - name: user-service
+          image: your-registry/user-service:1.0.0
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 8001
+          envFrom:
+            - configMapRef:
+                name: ecommerce-config
+          env:
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: ecommerce-secrets
+                  key: DB_PASSWORD
+            - name: USER_SERVICE_VERSION
+              value: "blue"
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "128Mi"
+            limits:
+              cpu: "500m"
+              memory: "256Mi"
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8001
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8001
+            initialDelaySeconds: 10
+            periodSeconds: 10
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: product-service-blue
+  namespace: ecommerce-blue
+  labels:
+    app: product-service
+    color: blue
+    version: v1
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: product-service
+      color: blue
+  template:
+    metadata:
+      labels:
+        app: product-service
+        color: blue
+        version: v1
+    spec:
+      containers:
+        - name: product-service
+          image: your-registry/product-service:1.0.0
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 8002
+          envFrom:
+            - configMapRef:
+                name: ecommerce-config
+          env:
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: ecommerce-secrets
+                  key: DB_PASSWORD
+            - name: PRODUCT_SERVICE_VERSION
+              value: "blue"
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "128Mi"
+            limits:
+              cpu: "500m"
+              memory: "256Mi"
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8002
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8002
+            initialDelaySeconds: 10
+            periodSeconds: 10
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: order-service-blue
+  namespace: ecommerce-blue
+  labels:
+    app: order-service
+    color: blue
+    version: v1
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: order-service
+      color: blue
+  template:
+    metadata:
+      labels:
+        app: order-service
+        color: blue
+        version: v1
+    spec:
+      containers:
+        - name: order-service
+          image: your-registry/order-service:1.0.0
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 8003
+          envFrom:
+            - configMapRef:
+                name: ecommerce-config
+          env:
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: ecommerce-secrets
+                  key: DB_PASSWORD
+            - name: ORDER_SERVICE_VERSION
+              value: "blue"
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "128Mi"
+            limits:
+              cpu: "500m"
+              memory: "256Mi"
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8003
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8003
+            initialDelaySeconds: 10
+            periodSeconds: 10
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: cart-service-blue
+  namespace: ecommerce-blue
+  labels:
+    app: cart-service
+    color: blue
+    version: v1
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: cart-service
+      color: blue
+  template:
+    metadata:
+      labels:
+        app: cart-service
+        color: blue
+        version: v1
+    spec:
+      containers:
+        - name: cart-service
+          image: your-registry/cart-service:1.0.0
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 8004
+          envFrom:
+            - configMapRef:
+                name: ecommerce-config
+          env:
+            - name: CART_SERVICE_VERSION
+              value: "blue"
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "128Mi"
+            limits:
+              cpu: "500m"
+              memory: "256Mi"
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8004
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8004
+            initialDelaySeconds: 10
+            periodSeconds: 10

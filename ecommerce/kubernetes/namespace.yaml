@@ -1,0 +1,23 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: ecommerce-blue
+  labels:
+    app: ecommerce
+    color: blue
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: ecommerce-green
+  labels:
+    app: ecommerce
+    color: green
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: ecommerce-monitoring
+  labels:
+    app: ecommerce
+    color: monitoring

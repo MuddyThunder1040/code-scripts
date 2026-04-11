@@ -1,0 +1,50 @@
+# Production Traffic Router Service
+#
+# This Service acts as the production load balancer.
+# To switch traffic from blue to green (or back), update the selector color label.
+#
+# Switch to green:
+#   kubectl patch service production-router -n ecommerce \
+#     --type='json' \
+#     -p='[{"op": "replace", "path": "/spec/selector/color", "value": "green"}]'
+#
+# Switch back to blue:
+#   kubectl patch service production-router -n ecommerce \
+#     --type='json' \
+#     -p='[{"op": "replace", "path": "/spec/selector/color", "value": "blue"}]'
+#
+# Or use the helper script:
+#   ./scripts/blue-green-switch.sh green
+#   ./scripts/blue-green-switch.sh blue
+
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: ecommerce
+  labels:
+    app: ecommerce
+---
+# Production router for user-service
+# Change selector color: blue → green to switch traffic
+apiVersion: v1
+kind: Service
+metadata:
+  name: production-router
+  namespace: ecommerce
+  labels:
+    app: ecommerce
+    role: production-router
+  annotations:
+    # Current active color - update this comment when switching
+    deployment.ecommerce/active-color: "blue"
+spec:
+  type: LoadBalancer
+  # IMPORTANT: Change 'color: blue' to 'color: green' to route traffic to green deployment
+  selector:
+    app: user-service
+    color: blue
+  ports:
+    - name: http
+      port: 80
+      targetPort: 8001
+      protocol: TCP

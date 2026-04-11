@@ -1,0 +1,152 @@
+version: "3.9"
+
+networks:
+  ecommerce-network:
+    driver: bridge
+
+volumes:
+  postgres_data:
+  redis_data:
+
+services:
+  # ── PostgreSQL ────────────────────────────────────────────────
+  postgres:
+    image: postgres:15
+    container_name: postgres
+    environment:
+      POSTGRES_DB: ecommerce
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./databases/postgres/init.sql:/docker-entrypoint-initdb.d/init.sql
+    networks:
+      - ecommerce-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d ecommerce"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    restart: unless-stopped
+
+  # ── Redis ─────────────────────────────────────────────────────
+  redis:
+    image: redis:7-alpine
+    container_name: redis
+    volumes:
+      - redis_data:/data
+    networks:
+      - ecommerce-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  # ── User Service ──────────────────────────────────────────────
+  user-service:
+    build: ./services/user-service
+    container_name: user-service
+    environment:
+      DB_HOST: postgres
+      DB_PORT: "5432"
+      DB_NAME: ecommerce
+      DB_USER: postgres
+      DB_PASSWORD: postgres
+      USER_SERVICE_VERSION: "blue"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - ecommerce-network
+    labels:
+      color: "blue"
+      version: "1.0.0"
+    restart: unless-stopped
+
+  # ── Product Service ───────────────────────────────────────────
+  product-service:
+    build: ./services/product-service
+    container_name: product-service
+    environment:
+      DB_HOST: postgres
+      DB_PORT: "5432"
+      DB_NAME: ecommerce
+      DB_USER: postgres
+      DB_PASSWORD: postgres
+      PRODUCT_SERVICE_VERSION: "blue"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - ecommerce-network
+    labels:
+      color: "blue"
+      version: "1.0.0"
+    restart: unless-stopped
+
+  # ── Order Service ─────────────────────────────────────────────
+  order-service:
+    build: ./services/order-service
+    container_name: order-service
+    environment:
+      DB_HOST: postgres
+      DB_PORT: "5432"
+      DB_NAME: ecommerce
+      DB_USER: postgres
+      DB_PASSWORD: postgres
+      ORDER_SERVICE_VERSION: "blue"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - ecommerce-network
+    labels:
+      color: "blue"
+      version: "1.0.0"
+    restart: unless-stopped
+
+  # ── Cart Service ──────────────────────────────────────────────
+  cart-service:
+    build: ./services/cart-service
+    container_name: cart-service
+    environment:
+      REDIS_HOST: redis
+      REDIS_PORT: "6379"
+      CART_SERVICE_VERSION: "blue"
+    depends_on:
+      redis:
+        condition: service_healthy
+    networks:
+      - ecommerce-network
+    labels:
+      color: "blue"
+      version: "1.0.0"
+    restart: unless-stopped
+
+  # ── Frontend ──────────────────────────────────────────────────
+  frontend:
+    build: ./services/frontend
+    container_name: frontend
+    networks:
+      - ecommerce-network
+    depends_on:
+      - api-gateway
+    restart: unless-stopped
+
+  # ── API Gateway ───────────────────────────────────────────────
+  api-gateway:
+    build: ./api-gateway
+    container_name: api-gateway
+    ports:
+      - "80:80"
+    depends_on:
+      - user-service
+      - product-service
+      - order-service
+      - cart-service
+    networks:
+      - ecommerce-network
+    restart: unless-stopped

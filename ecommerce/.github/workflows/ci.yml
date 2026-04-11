@@ -1,0 +1,302 @@
+name: CI Pipeline
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+    branches: ["**"]
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_PREFIX: ${{ github.repository_owner }}/shopcloud
+
+jobs:
+  # ============================================================
+  # Job 1: Lint Python code with flake8
+  # ============================================================
+  lint:
+    name: Lint Python
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Install flake8
+        run: pip install flake8 flake8-bugbear
+
+      - name: Lint user-service
+        run: |
+          flake8 services/user-service/main.py \
+            --max-line-length=120 \
+            --extend-ignore=E501,W503 \
+            --statistics
+        working-directory: ${{ github.workspace }}/ecommerce
+
+      - name: Lint product-service
+        run: |
+          flake8 services/product-service/main.py \
+            --max-line-length=120 \
+            --extend-ignore=E501,W503 \
+            --statistics
+        working-directory: ${{ github.workspace }}/ecommerce
+
+      - name: Lint order-service
+        run: |
+          flake8 services/order-service/main.py \
+            --max-line-length=120 \
+            --extend-ignore=E501,W503 \
+            --statistics
+        working-directory: ${{ github.workspace }}/ecommerce
+
+      - name: Lint cart-service
+        run: |
+          flake8 services/cart-service/main.py \
+            --max-line-length=120 \
+            --extend-ignore=E501,W503 \
+            --statistics
+        working-directory: ${{ github.workspace }}/ecommerce
+
+  # ============================================================
+  # Job 2: Build Docker images (matrix strategy)
+  # ============================================================
+  build:
+    name: Build ${{ matrix.service }}
+    runs-on: ubuntu-latest
+    needs: lint
+    strategy:
+      fail-fast: false
+      matrix:
+        service:
+          - user-service
+          - product-service
+          - order-service
+          - cart-service
+          - frontend
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Set image metadata
+        id: meta
+        run: |
+          SHA="${{ github.sha }}"
+          SHORT_SHA="${SHA:0:7}"
+          echo "short_sha=${SHORT_SHA}" >> "$GITHUB_OUTPUT"
+          echo "image_tag=${SHORT_SHA}" >> "$GITHUB_OUTPUT"
+
+      - name: Build Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: ecommerce/services/${{ matrix.service }}
+          push: false
+          load: true
+          tags: |
+            shopcloud/${{ matrix.service }}:${{ steps.meta.outputs.short_sha }}
+            shopcloud/${{ matrix.service }}:latest
+          cache-from: type=gha,scope=${{ matrix.service }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.service }}
+
+      - name: Save image to tar
+        run: |
+          docker save "shopcloud/${{ matrix.service }}:${{ steps.meta.outputs.short_sha }}" \
+            -o /tmp/${{ matrix.service }}.tar
+
+      - name: Upload image artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: image-${{ matrix.service }}-${{ steps.meta.outputs.short_sha }}
+          path: /tmp/${{ matrix.service }}.tar
+          retention-days: 1
+
+  # ============================================================
+  # Job 3: Integration test with docker-compose
+  # ============================================================
+  test:
+    name: Integration Tests
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Compose
+        run: docker compose version
+
+      - name: Start services
+        run: |
+          docker compose up -d --build
+        working-directory: ${{ github.workspace }}/ecommerce
+
+      - name: Wait for services to be healthy
+        run: |
+          echo "Waiting for services to start..."
+          TIMEOUT=120
+          ELAPSED=0
+          while [ $ELAPSED -lt $TIMEOUT ]; do
+            STATUS=$(docker compose ps --format json 2>/dev/null | python3 -c "
+          import sys, json
+          data = sys.stdin.read().strip()
+          services = [json.loads(l) for l in data.split('\n') if l.strip()]
+          unhealthy = [s['Name'] for s in services if s.get('Health','') not in ['healthy',''] and s.get('Status','') != 'running']
+          print('ok' if not unhealthy else 'waiting: ' + ', '.join(unhealthy))
+          " 2>/dev/null || echo "waiting")
+            if [ "$STATUS" = "ok" ]; then
+              echo "All services ready!"
+              break
+            fi
+            echo "Status: $STATUS (${ELAPSED}s elapsed)"
+            sleep 5
+            ELAPSED=$((ELAPSED + 5))
+          done
+        working-directory: ${{ github.workspace }}/ecommerce
+
+      - name: Health check - API Gateway
+        run: |
+          curl -sf http://localhost/api/health | python3 -c "
+          import sys, json
+          d = json.load(sys.stdin)
+          assert d.get('status') == 'ok', f'Expected ok, got {d}'
+          print('API Gateway: OK')
+          "
+
+      - name: Health check - User Service
+        run: |
+          curl -sf http://localhost/api/users/health | python3 -c "
+          import sys, json
+          d = json.load(sys.stdin)
+          assert d.get('status') == 'healthy', f'Expected healthy, got {d}'
+          print(f\"User Service: OK (version={d.get('version')})\")"
+
+      - name: Health check - Product Service
+        run: |
+          curl -sf http://localhost/api/products/health | python3 -c "
+          import sys, json
+          d = json.load(sys.stdin)
+          assert d.get('status') == 'healthy', f'Expected healthy, got {d}'
+          print(f\"Product Service: OK (version={d.get('version')})\")"
+
+      - name: Health check - Order Service
+        run: |
+          curl -sf http://localhost/api/orders/health | python3 -c "
+          import sys, json
+          d = json.load(sys.stdin)
+          assert d.get('status') == 'healthy', f'Expected healthy, got {d}'
+          print(f\"Order Service: OK (version={d.get('version')})\")"
+
+      - name: Health check - Cart Service
+        run: |
+          curl -sf http://localhost/api/cart/health | python3 -c "
+          import sys, json
+          d = json.load(sys.stdin)
+          assert d.get('status') == 'healthy', f'Expected healthy, got {d}'
+          print(f\"Cart Service: OK (version={d.get('version')})\")"
+
+      - name: Functional test - List products
+        run: |
+          curl -sf http://localhost/api/products/ | python3 -c "
+          import sys, json
+          products = json.load(sys.stdin)
+          assert isinstance(products, list), 'Expected a list of products'
+          assert len(products) > 0, 'Expected at least one product'
+          print(f'Products: {len(products)} items returned')
+          "
+
+      - name: Functional test - Register user
+        run: |
+          RESULT=$(curl -sf -X POST http://localhost/api/users/register \
+            -H 'Content-Type: application/json' \
+            -d '{"username":"testci","email":"testci@example.com","password":"testpass123"}')
+          echo "$RESULT" | python3 -c "
+          import sys, json
+          d = json.load(sys.stdin)
+          assert 'id' in d, f'Expected id in response: {d}'
+          assert d.get('email') == 'testci@example.com', f'Unexpected email: {d}'
+          print(f\"User registered: id={d['id']}, email={d['email']}\")"
+
+      - name: Functional test - Add to cart
+        run: |
+          curl -sf -X POST http://localhost/api/cart/1/items \
+            -H 'Content-Type: application/json' \
+            -d '{"product_id":1,"quantity":2,"price":9.99,"name":"Test Product"}' | python3 -c "
+          import sys, json
+          d = json.load(sys.stdin)
+          assert 'items' in d, f'Expected items in response: {d}'
+          assert len(d['items']) > 0, 'Expected at least one cart item'
+          print(f\"Cart updated: {len(d['items'])} item(s)\")"
+
+      - name: Collect docker logs on failure
+        if: failure()
+        run: docker compose logs --no-color
+        working-directory: ${{ github.workspace }}/ecommerce
+
+      - name: Tear down
+        if: always()
+        run: docker compose down -v
+        working-directory: ${{ github.workspace }}/ecommerce
+
+  # ============================================================
+  # Job 4: Security scan with Trivy
+  # ============================================================
+  security-scan:
+    name: Security Scan (${{ matrix.service }})
+    runs-on: ubuntu-latest
+    needs: build
+    strategy:
+      fail-fast: false
+      matrix:
+        service:
+          - user-service
+          - product-service
+          - order-service
+          - cart-service
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set short SHA
+        id: meta
+        run: echo "short_sha=${GITHUB_SHA:0:7}" >> "$GITHUB_OUTPUT"
+
+      - name: Download image artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: image-${{ matrix.service }}-${{ steps.meta.outputs.short_sha }}
+          path: /tmp
+
+      - name: Load Docker image
+        run: docker load -i /tmp/${{ matrix.service }}.tar
+
+      - name: Run Trivy vulnerability scan
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: "shopcloud/${{ matrix.service }}:${{ steps.meta.outputs.short_sha }}"
+          format: "sarif"
+          output: "trivy-${{ matrix.service }}.sarif"
+          severity: "CRITICAL,HIGH"
+          exit-code: "0"
+          ignore-unfixed: true
+
+      - name: Run Trivy table output (for PR comments)
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: "shopcloud/${{ matrix.service }}:${{ steps.meta.outputs.short_sha }}"
+          format: "table"
+          severity: "CRITICAL,HIGH"
+          exit-code: "0"
+          ignore-unfixed: true
+
+      - name: Upload Trivy SARIF results
+        uses: actions/upload-artifact@v4
+        with:
+          name: trivy-results-${{ matrix.service }}
+          path: trivy-${{ matrix.service }}.sarif
+          retention-days: 30

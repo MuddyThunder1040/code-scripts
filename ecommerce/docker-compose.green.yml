@@ -1,0 +1,49 @@
+version: "3.9"
+
+# Green deployment override
+# Usage: docker-compose -f docker-compose.yml -f docker-compose.green.yml up -d
+
+services:
+  user-service:
+    container_name: user-service-green
+    environment:
+      USER_SERVICE_VERSION: "green"
+    labels:
+      color: "green"
+      version: "2.0.0"
+      deployment: "green"
+
+  product-service:
+    container_name: product-service-green
+    environment:
+      PRODUCT_SERVICE_VERSION: "green"
+    labels:
+      color: "green"
+      version: "2.0.0"
+      deployment: "green"
+
+  order-service:
+    container_name: order-service-green
+    environment:
+      ORDER_SERVICE_VERSION: "green"
+    labels:
+      color: "green"
+      version: "2.0.0"
+      deployment: "green"
+
+  cart-service:
+    container_name: cart-service-green
+    environment:
+      CART_SERVICE_VERSION: "green"
+    labels:
+      color: "green"
+      version: "2.0.0"
+      deployment: "green"
+
+  frontend:
+    container_name: frontend-green
+
+  api-gateway:
+    container_name: api-gateway-green
+    ports:
+      - "8081:80"

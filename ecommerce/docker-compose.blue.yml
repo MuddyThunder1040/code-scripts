@@ -1,0 +1,49 @@
+version: "3.9"
+
+# Blue deployment override
+# Usage: docker-compose -f docker-compose.yml -f docker-compose.blue.yml up -d
+
+services:
+  user-service:
+    container_name: user-service-blue
+    environment:
+      USER_SERVICE_VERSION: "blue"
+    labels:
+      color: "blue"
+      version: "1.0.0"
+      deployment: "blue"
+
+  product-service:
+    container_name: product-service-blue
+    environment:
+      PRODUCT_SERVICE_VERSION: "blue"
+    labels:
+      color: "blue"
+      version: "1.0.0"
+      deployment: "blue"
+
+  order-service:
+    container_name: order-service-blue
+    environment:
+      ORDER_SERVICE_VERSION: "blue"
+    labels:
+      color: "blue"
+      version: "1.0.0"
+      deployment: "blue"
+
+  cart-service:
+    container_name: cart-service-blue
+    environment:
+      CART_SERVICE_VERSION: "blue"
+    labels:
+      color: "blue"
+      version: "1.0.0"
+      deployment: "blue"
+
+  frontend:
+    container_name: frontend-blue
+
+  api-gateway:
+    container_name: api-gateway-blue
+    ports:
+      - "8080:80"
