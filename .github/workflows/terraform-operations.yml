@@ -7,7 +7,7 @@ on:
         description: 'Terraform module directory'
         required: true
         type: choice
-        options: [Local, Docker, S3]
+        options: [Cassandra, Local, Docker, S3]
       branch:
         description: 'Git branch to use' 
         required: true
@@ -27,6 +27,12 @@ jobs:
         uses: actions/checkout@v4
         with:
           ref: ${{ inputs.branch }}
+          clean: false
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.5.7
 
       - name: Terraform Login
         run: |
@@ -38,6 +44,13 @@ jobs:
       - name: Terraform init
         working-directory: ${{ inputs.module }}
         run: terraform init
+
+      - name: Clean up Cassandra Docker conflicts
+        if: inputs.action == 'apply' && inputs.module == 'Cassandra'
+        run: |
+          docker ps -a --filter "name=cassandra" --quiet | xargs -r docker rm -f
+          docker network ls --filter "name=^cassandra-network$" --quiet | xargs -r docker network rm
+          echo "Cleaned up conflicting Cassandra containers and network"
 
       - name: Clean up Docker resources (if needed)
         if: inputs.action == 'apply' && inputs.module == 'Docker'
@@ -56,6 +69,33 @@ jobs:
           else
             terraform ${{ inputs.action }}
           fi
+
+      - name: Verify Cassandra cluster
+        if: inputs.action == 'apply' && inputs.module == 'Cassandra'
+        working-directory: ${{ inputs.module }}
+        run: |
+          node_count=$(terraform output -no-color node_container_names | grep -c '"cassandra-node-')
+          expected_nodes=$((1 + node_count))
+
+          for attempt in $(seq 1 20); do
+            echo "Checking Cassandra cluster status, attempt ${attempt}/20..."
+
+            if docker exec cassandra-seed nodetool status | tee /tmp/cassandra-nodetool-status.txt; then
+              up_nodes=$(awk '/^UN/ { count++ } END { print count + 0 }' /tmp/cassandra-nodetool-status.txt)
+
+              if [ "$up_nodes" -eq "$expected_nodes" ]; then
+                echo "Cassandra cluster is ready with ${up_nodes}/${expected_nodes} nodes up."
+                exit 0
+              fi
+
+              echo "Cassandra has ${up_nodes}/${expected_nodes} nodes up; waiting for the rest."
+            fi
+
+            sleep 30
+          done
+
+          echo "Cassandra cluster did not become ready in time."
+          exit 1
 
       - name: Notify Slack (success)
         if: success() && (inputs.action == 'apply' || inputs.action == 'destroy')
