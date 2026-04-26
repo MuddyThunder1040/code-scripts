@@ -11,8 +11,8 @@ terraform {
       version = "~> 0.11"
     }
   }
-    cloud {
-      organization = "oiasis-org"
+  cloud {
+    organization = "oiasis-org"
 
     workspaces {
       name = "homelab-tf"
@@ -92,36 +92,23 @@ resource "time_sleep" "after_seed_bootstrap" {
   }
 }
 
-resource "time_sleep" "before_node_join" {
-  count = var.cassandra_node_count
+resource "docker_container" "node_1" {
+  count = var.cassandra_node_count >= 1 ? 1 : 0
 
-  create_duration = "${var.node_join_wait_seconds * count.index}s"
-
-  triggers = {
-    seed_ready = time_sleep.after_seed_bootstrap.id
-  }
-}
-
-resource "docker_container" "node" {
-  count = var.cassandra_node_count
-
-  name     = "${var.node_container_name_prefix}-${count.index + 1}"
+  name     = "${var.node_container_name_prefix}-1"
   image    = docker_image.cassandra.image_id
-  hostname = "${var.node_container_name_prefix}-${count.index + 1}"
+  hostname = "${var.node_container_name_prefix}-1"
   restart  = var.restart_policy
 
   networks_advanced {
     name    = docker_network.cassandra.name
-    aliases = ["${var.node_container_name_prefix}-${count.index + 1}"]
+    aliases = ["${var.node_container_name_prefix}-1"]
   }
 
-  env = concat(
-    local.cassandra_env,
-    ["TERRAFORM_NODE_JOIN_DELAY=${time_sleep.before_node_join[count.index].id}"]
-  )
+  env = local.cassandra_env
 
   volumes {
-    volume_name    = docker_volume.node_data[count.index].name
+    volume_name    = docker_volume.node_data[0].name
     container_path = "/var/lib/cassandra"
   }
 
@@ -133,4 +120,216 @@ resource "docker_container" "node" {
     soft = 100000
     hard = 100000
   }
+
+  depends_on = [time_sleep.after_seed_bootstrap]
+}
+
+resource "time_sleep" "after_node_1_join" {
+  count = var.cassandra_node_count >= 2 ? 1 : 0
+
+  create_duration = "${var.node_join_wait_seconds}s"
+
+  triggers = {
+    node_id = docker_container.node_1[0].id
+  }
+}
+
+resource "docker_container" "node_2" {
+  count = var.cassandra_node_count >= 2 ? 1 : 0
+
+  name     = "${var.node_container_name_prefix}-2"
+  image    = docker_image.cassandra.image_id
+  hostname = "${var.node_container_name_prefix}-2"
+  restart  = var.restart_policy
+
+  networks_advanced {
+    name    = docker_network.cassandra.name
+    aliases = ["${var.node_container_name_prefix}-2"]
+  }
+
+  env = local.cassandra_env
+
+  volumes {
+    volume_name    = docker_volume.node_data[1].name
+    container_path = "/var/lib/cassandra"
+  }
+
+  memory = var.container_memory_mb
+  cpus   = var.container_cpus
+
+  ulimit {
+    name = "nofile"
+    soft = 100000
+    hard = 100000
+  }
+
+  depends_on = [time_sleep.after_node_1_join]
+}
+
+resource "time_sleep" "after_node_2_join" {
+  count = var.cassandra_node_count >= 3 ? 1 : 0
+
+  create_duration = "${var.node_join_wait_seconds}s"
+
+  triggers = {
+    node_id = docker_container.node_2[0].id
+  }
+}
+
+resource "docker_container" "node_3" {
+  count = var.cassandra_node_count >= 3 ? 1 : 0
+
+  name     = "${var.node_container_name_prefix}-3"
+  image    = docker_image.cassandra.image_id
+  hostname = "${var.node_container_name_prefix}-3"
+  restart  = var.restart_policy
+
+  networks_advanced {
+    name    = docker_network.cassandra.name
+    aliases = ["${var.node_container_name_prefix}-3"]
+  }
+
+  env = local.cassandra_env
+
+  volumes {
+    volume_name    = docker_volume.node_data[2].name
+    container_path = "/var/lib/cassandra"
+  }
+
+  memory = var.container_memory_mb
+  cpus   = var.container_cpus
+
+  ulimit {
+    name = "nofile"
+    soft = 100000
+    hard = 100000
+  }
+
+  depends_on = [time_sleep.after_node_2_join]
+}
+
+resource "time_sleep" "after_node_3_join" {
+  count = var.cassandra_node_count >= 4 ? 1 : 0
+
+  create_duration = "${var.node_join_wait_seconds}s"
+
+  triggers = {
+    node_id = docker_container.node_3[0].id
+  }
+}
+
+resource "docker_container" "node_4" {
+  count = var.cassandra_node_count >= 4 ? 1 : 0
+
+  name     = "${var.node_container_name_prefix}-4"
+  image    = docker_image.cassandra.image_id
+  hostname = "${var.node_container_name_prefix}-4"
+  restart  = var.restart_policy
+
+  networks_advanced {
+    name    = docker_network.cassandra.name
+    aliases = ["${var.node_container_name_prefix}-4"]
+  }
+
+  env = local.cassandra_env
+
+  volumes {
+    volume_name    = docker_volume.node_data[3].name
+    container_path = "/var/lib/cassandra"
+  }
+
+  memory = var.container_memory_mb
+  cpus   = var.container_cpus
+
+  ulimit {
+    name = "nofile"
+    soft = 100000
+    hard = 100000
+  }
+
+  depends_on = [time_sleep.after_node_3_join]
+}
+
+resource "time_sleep" "after_node_4_join" {
+  count = var.cassandra_node_count >= 5 ? 1 : 0
+
+  create_duration = "${var.node_join_wait_seconds}s"
+
+  triggers = {
+    node_id = docker_container.node_4[0].id
+  }
+}
+
+resource "docker_container" "node_5" {
+  count = var.cassandra_node_count >= 5 ? 1 : 0
+
+  name     = "${var.node_container_name_prefix}-5"
+  image    = docker_image.cassandra.image_id
+  hostname = "${var.node_container_name_prefix}-5"
+  restart  = var.restart_policy
+
+  networks_advanced {
+    name    = docker_network.cassandra.name
+    aliases = ["${var.node_container_name_prefix}-5"]
+  }
+
+  env = local.cassandra_env
+
+  volumes {
+    volume_name    = docker_volume.node_data[4].name
+    container_path = "/var/lib/cassandra"
+  }
+
+  memory = var.container_memory_mb
+  cpus   = var.container_cpus
+
+  ulimit {
+    name = "nofile"
+    soft = 100000
+    hard = 100000
+  }
+
+  depends_on = [time_sleep.after_node_4_join]
+}
+
+resource "time_sleep" "after_node_5_join" {
+  count = var.cassandra_node_count >= 6 ? 1 : 0
+
+  create_duration = "${var.node_join_wait_seconds}s"
+
+  triggers = {
+    node_id = docker_container.node_5[0].id
+  }
+}
+
+resource "docker_container" "node_6" {
+  count = var.cassandra_node_count >= 6 ? 1 : 0
+
+  name     = "${var.node_container_name_prefix}-6"
+  image    = docker_image.cassandra.image_id
+  hostname = "${var.node_container_name_prefix}-6"
+  restart  = var.restart_policy
+
+  networks_advanced {
+    name    = docker_network.cassandra.name
+    aliases = ["${var.node_container_name_prefix}-6"]
+  }
+
+  env = local.cassandra_env
+
+  volumes {
+    volume_name    = docker_volume.node_data[5].name
+    container_path = "/var/lib/cassandra"
+  }
+
+  memory = var.container_memory_mb
+  cpus   = var.container_cpus
+
+  ulimit {
+    name = "nofile"
+    soft = 100000
+    hard = 100000
+  }
+
+  depends_on = [time_sleep.after_node_5_join]
 }

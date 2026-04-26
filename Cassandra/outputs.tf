@@ -5,7 +5,14 @@ output "seed_container_name" {
 
 output "node_container_names" {
   description = "Non-seed Cassandra containers."
-  value       = docker_container.node[*].name
+  value = concat(
+    docker_container.node_1[*].name,
+    docker_container.node_2[*].name,
+    docker_container.node_3[*].name,
+    docker_container.node_4[*].name,
+    docker_container.node_5[*].name,
+    docker_container.node_6[*].name
+  )
 }
 
 output "cql_endpoint" {

@@ -32,6 +32,11 @@ variable "cassandra_node_count" {
   description = "Number of non-seed Cassandra nodes to create."
   type        = number
   default     = 5
+
+  validation {
+    condition     = var.cassandra_node_count >= 0 && var.cassandra_node_count <= 6
+    error_message = "cassandra_node_count must be between 0 and 6."
+  }
 }
 
 variable "num_tokens" {
