@@ -7,7 +7,7 @@ on:
         description: 'Terraform module directory'
         required: true
         type: choice
-        options: [Cassandra, Local, Docker, S3]
+        options: [Cassandra, Local, Docker, Localstack]
       branch:
         description: 'Git branch to use' 
         required: true
