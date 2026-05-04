@@ -1,5 +1,5 @@
 pipeline {
-    agent { label 'DELL' }
+    agent any
 
     options {
         timestamps()
@@ -8,7 +8,7 @@ pipeline {
     parameters {
         choice(
             name: 'Module',
-            choices: ['Local', 'Instance', 'S3'],
+            choices: ['Local', 'Instance', 'Docker', 'Localstack'],
             description: 'Select the Terraform module to use'
         )
         string(
