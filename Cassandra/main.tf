@@ -16,7 +16,7 @@ locals {
     "NUM_TOKENS=${var.num_tokens}",
     "LOCAL_JMX=no",
     "JMX_PORT=7199",
-    "JVM_EXTRA_OPTS=-Xms${var.max_heap_size} -Xmx${var.max_heap_size} -Xmn${var.heap_new_size} -XX:MaxDirectMemorySize=${var.max_direct_memory_size} -Dcom.sun.management.jmxremote.port=7199 -Dcom.sun.management.jmxremote.rmi.port=7199 -Dcom.sun.management.jmxremote.ssl=false -Dcom.sun.management.jmxremote.authenticate=false"
+    "JVM_EXTRA_OPTS=-Xms${var.max_heap_size} -Xmx${var.max_heap_size} -Xmn${var.heap_new_size} -XX:MaxDirectMemorySize=${var.max_direct_memory_size} -Djava.rmi.server.hostname=${var.seed_container_name} -Dcom.sun.management.jmxremote.port=7199 -Dcom.sun.management.jmxremote.rmi.port=7199 -Dcom.sun.management.jmxremote.ssl=false -Dcom.sun.management.jmxremote.authenticate=false"
   ]
 
   cassandra_env = var.cassandra_distribution == "dse" ? local.dse_env : local.apache_cassandra_env

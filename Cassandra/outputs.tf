@@ -22,7 +22,7 @@ output "cql_endpoint" {
 
 output "nodetool_status_command" {
   description = "Command to verify cluster status from the self-hosted runner."
-  value       = "docker exec ${docker_container.seed.name} nodetool status"
+  value       = "docker exec ${docker_container.seed.name} nodetool -h ${docker_container.seed.name} -p 7199 status"
 }
 
 output "docker_network_name" {
@@ -55,6 +55,6 @@ output "opscenter_debug_commands" {
   value = var.enable_opscenter ? [
     "docker logs ${var.opscenter_container_name}",
     "docker exec ${var.opscenter_container_name} sh -lc 'getent hosts ${var.seed_container_name} && nc -vz ${var.seed_container_name} 9042'",
-    "docker exec ${docker_container.seed.name} nodetool status"
+    "docker exec ${docker_container.seed.name} nodetool -h ${docker_container.seed.name} -p 7199 status"
   ] : []
 }

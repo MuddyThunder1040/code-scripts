@@ -78,13 +78,15 @@ jobs:
         if: inputs.action == 'apply' && inputs.module == 'Cassandra'
         working-directory: ${{ inputs.module }}
         run: |
+          set -o pipefail
+
           node_count=$(terraform output -no-color node_container_names | grep -c '"cassandra-node-' || true)
           expected_nodes=$((1 + node_count))
 
           for attempt in $(seq 1 20); do
             echo "Checking Cassandra cluster status, attempt ${attempt}/20..."
 
-            if docker exec cassandra-seed nodetool status | tee /tmp/cassandra-nodetool-status.txt; then
+            if docker exec cassandra-seed nodetool -h cassandra-seed -p 7199 status | tee /tmp/cassandra-nodetool-status.txt; then
               up_nodes=$(awk '/^UN/ { count++ } END { print count + 0 }' /tmp/cassandra-nodetool-status.txt)
 
               if [ "$up_nodes" -eq "$expected_nodes" ]; then
