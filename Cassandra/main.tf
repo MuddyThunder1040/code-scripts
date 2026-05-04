@@ -14,7 +14,9 @@ locals {
     "CLUSTER_NAME=${var.cluster_name}",
     "SEEDS=${var.seed_container_name}",
     "NUM_TOKENS=${var.num_tokens}",
-    "JVM_EXTRA_OPTS=-Xms${var.max_heap_size} -Xmx${var.max_heap_size} -Xmn${var.heap_new_size} -XX:MaxDirectMemorySize=${var.max_direct_memory_size}"
+    "LOCAL_JMX=no",
+    "JMX_PORT=7199",
+    "JVM_EXTRA_OPTS=-Xms${var.max_heap_size} -Xmx${var.max_heap_size} -Xmn${var.heap_new_size} -XX:MaxDirectMemorySize=${var.max_direct_memory_size} -Dcom.sun.management.jmxremote.port=7199 -Dcom.sun.management.jmxremote.rmi.port=7199 -Dcom.sun.management.jmxremote.ssl=false -Dcom.sun.management.jmxremote.authenticate=false"
   ]
 
   cassandra_env = var.cassandra_distribution == "dse" ? local.dse_env : local.apache_cassandra_env
@@ -76,6 +78,11 @@ resource "docker_container" "seed" {
   ports {
     internal = 9042
     external = var.seed_cql_port
+  }
+
+  ports {
+    internal = 7199
+    external = var.seed_jmx_port
   }
 
   volumes {

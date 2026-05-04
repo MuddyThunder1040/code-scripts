@@ -15,6 +15,7 @@ heap_new_size = "256m"
 max_direct_memory_size = "512m"
 
 seed_cql_port       = 9042
+seed_jmx_port       = 7199
 container_memory_mb = 2048
 container_cpus      = "1.0"
 

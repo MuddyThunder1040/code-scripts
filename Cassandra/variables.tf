@@ -86,6 +86,12 @@ variable "seed_cql_port" {
   default     = 9042
 }
 
+variable "seed_jmx_port" {
+  description = "Host port mapped to the seed container JMX port 7199."
+  type        = number
+  default     = 7199
+}
+
 variable "container_memory_mb" {
   description = "Memory limit per Cassandra container in MB."
   type        = number
