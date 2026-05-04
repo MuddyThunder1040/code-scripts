@@ -13,7 +13,7 @@ pipeline {
         )
         string(
             name: 'Branch',
-            defaultValue: 'main',
+            defaultValue: 'INFR-5',
             description: 'Select the Git branch to use'
         )
         choice(
@@ -26,9 +26,7 @@ pipeline {
     stages {
         stage('Checkout Code') {
             steps {
-                git branch: "${params.Branch}",
-                    credentialsId: 'GITHUB_TOKEN',
-                    url: 'https://github.com/MuddyThunder1040/code-scripts.git'
+                git branch: "${params.Branch}", url: 'https://github.com/MuddyThunder1040/code-scripts.git'
             }
         }
 
