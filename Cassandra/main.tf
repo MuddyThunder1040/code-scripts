@@ -9,16 +9,13 @@ locals {
     "HEAP_NEWSIZE=${var.heap_new_size}"
   ]
 
-  dse_env = concat(
-    [
-      "DS_LICENSE=accept",
-      "CLUSTER_NAME=${var.cluster_name}",
-      "SEEDS=${var.seed_container_name}",
-      "NUM_TOKENS=${var.num_tokens}",
-      "JVM_EXTRA_OPTS=-Xms${var.heap_new_size} -Xmx${var.max_heap_size}"
-    ],
-    var.enable_opscenter ? ["OPSCENTER_IP=${var.opscenter_container_name}"] : []
-  )
+  dse_env = [
+    "DS_LICENSE=accept",
+    "CLUSTER_NAME=${var.cluster_name}",
+    "SEEDS=${var.seed_container_name}",
+    "NUM_TOKENS=${var.num_tokens}",
+    "JVM_EXTRA_OPTS=-Xms${var.heap_new_size} -Xmx${var.max_heap_size}"
+  ]
 
   cassandra_env = var.cassandra_distribution == "dse" ? local.dse_env : local.apache_cassandra_env
 
@@ -505,13 +502,5 @@ resource "docker_container" "opscenter" {
     }
   }
 
-  depends_on = [
-    docker_container.seed,
-    docker_container.node_1,
-    docker_container.node_2,
-    docker_container.node_3,
-    docker_container.node_4,
-    docker_container.node_5,
-    docker_container.node_6
-  ]
+  depends_on = [docker_network.cassandra]
 }

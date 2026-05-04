@@ -50,9 +50,11 @@ jobs:
         if: inputs.action == 'apply' && inputs.module == 'Cassandra'
         run: |
           docker ps -a --filter "name=cassandra" --quiet | xargs -r docker rm -f
+          docker ps -a --filter "name=opscenter" --quiet | xargs -r docker rm -f
           docker network ls --filter "name=^cassandra-network$" --quiet | xargs -r docker network rm
           docker volume ls --filter "name=^cassandra-data-" --quiet | xargs -r docker volume rm
-          echo "Cleaned up conflicting Cassandra containers, network, and volumes"
+          docker volume ls --filter "name=^opscenter-data$" --quiet | xargs -r docker volume rm
+          echo "Cleaned up conflicting Cassandra/OpsCenter containers, network, and volumes"
 
       - name: Clean up Docker resources (if needed)
         if: inputs.action == 'apply' && inputs.module == 'Docker'
@@ -91,12 +93,26 @@ jobs:
               fi
 
               echo "Cassandra has ${up_nodes}/${expected_nodes} nodes up; waiting for the rest."
+            else
+              seed_state=$(docker inspect -f '{{.State.Status}}' cassandra-seed 2>/dev/null || true)
+              echo "cassandra-seed state: ${seed_state:-unknown}"
+
+              if [ "$seed_state" = "restarting" ] || [ "$seed_state" = "exited" ]; then
+                echo "cassandra-seed is not staying up. Last 200 log lines:"
+                docker logs --tail=200 cassandra-seed || true
+                exit 1
+              fi
             fi
 
             sleep 30
           done
 
           echo "Cassandra cluster did not become ready in time."
+          echo "Container status:"
+          docker ps -a --filter "name=cassandra" || true
+          docker ps -a --filter "name=opscenter" || true
+          echo "cassandra-seed logs:"
+          docker logs --tail=200 cassandra-seed || true
           exit 1
 
       - name: Notify Slack (success)
