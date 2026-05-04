@@ -6,19 +6,20 @@ create_network             = true
 seed_container_name        = "cassandra-seed"
 node_container_name_prefix = "cassandra-node"
 
-# Additional DSE nodes after the seed. This creates a 3-node cluster.
-cassandra_node_count = 2
+# Additional DSE nodes after the seed. Keep this at 0 for a single-node DSE cluster.
+cassandra_node_count = 0
 
 num_tokens    = 16
 max_heap_size = "1g"
 heap_new_size = "256m"
+max_direct_memory_size = "512m"
 
 seed_cql_port       = 9042
 container_memory_mb = 2048
 container_cpus      = "1.0"
 
-seed_bootstrap_wait   = "180s"
-node_join_wait_seconds = 180
+seed_bootstrap_wait   = "30s"
+node_join_wait_seconds = 30
 
 volume_prefix  = "cassandra-data"
 restart_policy = "unless-stopped"

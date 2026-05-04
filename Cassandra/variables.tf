@@ -74,6 +74,12 @@ variable "heap_new_size" {
   default     = "512M"
 }
 
+variable "max_direct_memory_size" {
+  description = "DSE JVM max direct memory size. Keep this explicit for multi-container/laptop runs because DSE otherwise calculates from host memory."
+  type        = string
+  default     = "512m"
+}
+
 variable "seed_cql_port" {
   description = "Host port mapped to the seed container CQL port 9042."
   type        = number

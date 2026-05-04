@@ -14,7 +14,7 @@ locals {
     "CLUSTER_NAME=${var.cluster_name}",
     "SEEDS=${var.seed_container_name}",
     "NUM_TOKENS=${var.num_tokens}",
-    "JVM_EXTRA_OPTS=-Xms${var.heap_new_size} -Xmx${var.max_heap_size}"
+    "JVM_EXTRA_OPTS=-Xms${var.max_heap_size} -Xmx${var.max_heap_size} -Xmn${var.heap_new_size} -XX:MaxDirectMemorySize=${var.max_direct_memory_size}"
   ]
 
   cassandra_env = var.cassandra_distribution == "dse" ? local.dse_env : local.apache_cassandra_env
