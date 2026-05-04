@@ -1,6 +1,7 @@
 cassandra_image            = "cassandra:4.1"
 cluster_name               = "demo-cluster"
 network_name               = "cassandra-network"
+create_network             = true
 seed_container_name        = "cassandra-seed"
 node_container_name_prefix = "cassandra-node"
 
@@ -20,3 +21,12 @@ node_join_wait_seconds = 180
 
 volume_prefix  = "cassandra-data"
 restart_policy = "unless-stopped"
+
+enable_opscenter             = true
+opscenter_image              = "datastax/dse-opscenter:6.8.48"
+opscenter_container_name     = "opscenter"
+opscenter_ui_port            = 8888
+opscenter_agent_port         = 61620
+opscenter_persistent_volume  = true
+opscenter_volume_name        = "opscenter-data"
+opscenter_extra_env          = []

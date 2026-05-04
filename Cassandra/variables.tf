@@ -16,6 +16,12 @@ variable "network_name" {
   default     = "cassandra-network"
 }
 
+variable "create_network" {
+  description = "Create the Docker network. Set to false to attach Cassandra and OpsCenter to an existing Docker network."
+  type        = bool
+  default     = true
+}
+
 variable "seed_container_name" {
   description = "Name and Docker DNS alias for the seed container."
   type        = string
@@ -97,4 +103,52 @@ variable "restart_policy" {
   description = "Docker restart policy for Cassandra containers."
   type        = string
   default     = "unless-stopped"
+}
+
+variable "enable_opscenter" {
+  description = "Create a DataStax OpsCenter container on the Cassandra Docker network."
+  type        = bool
+  default     = true
+}
+
+variable "opscenter_image" {
+  description = "Docker image for DataStax OpsCenter. Use a locally loaded/tagged IBM Fix Central image if the public image is unavailable."
+  type        = string
+  default     = "datastax/dse-opscenter:6.8.48"
+}
+
+variable "opscenter_container_name" {
+  description = "OpsCenter container name and Docker DNS alias."
+  type        = string
+  default     = "opscenter"
+}
+
+variable "opscenter_ui_port" {
+  description = "Host port mapped to the OpsCenter UI port 8888."
+  type        = number
+  default     = 8888
+}
+
+variable "opscenter_agent_port" {
+  description = "Host port mapped to the OpsCenter agent STOMP communication port 61620."
+  type        = number
+  default     = 61620
+}
+
+variable "opscenter_persistent_volume" {
+  description = "Persist OpsCenter state in a Docker volume."
+  type        = bool
+  default     = true
+}
+
+variable "opscenter_volume_name" {
+  description = "Docker volume name for OpsCenter state."
+  type        = string
+  default     = "opscenter-data"
+}
+
+variable "opscenter_extra_env" {
+  description = "Additional environment variables to pass to the OpsCenter container."
+  type        = list(string)
+  default     = []
 }

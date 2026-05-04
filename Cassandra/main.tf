@@ -1,29 +1,6 @@
-terraform {
-  required_version = ">= 1.5.0"
-
-  required_providers {
-    docker = {
-      source  = "kreuzwerker/docker"
-      version = "~> 3.0"
-    }
-    time = {
-      source  = "hashicorp/time"
-      version = "~> 0.11"
-    }
-  }
-  cloud {
-    organization = "oiasis-org"
-
-    workspaces {
-      name = "homelab-tf"
-    }
-  }
-}
-
-provider "docker" {}
-provider "time" {}
-
 locals {
+  cassandra_network_name = var.create_network ? docker_network.cassandra[0].name : data.docker_network.cassandra[0].name
+
   cassandra_env = [
     "CASSANDRA_CLUSTER_NAME=${var.cluster_name}",
     "CASSANDRA_SEEDS=${var.seed_container_name}",
@@ -31,14 +8,31 @@ locals {
     "MAX_HEAP_SIZE=${var.max_heap_size}",
     "HEAP_NEWSIZE=${var.heap_new_size}"
   ]
+
+  cassandra_node_hostnames = concat(
+    [var.seed_container_name],
+    [for index in range(var.cassandra_node_count) : "${var.node_container_name_prefix}-${index + 1}"]
+  )
+}
+
+data "docker_network" "cassandra" {
+  count = var.create_network ? 0 : 1
+  name  = var.network_name
 }
 
 resource "docker_network" "cassandra" {
-  name = var.network_name
+  count = var.create_network ? 1 : 0
+  name  = var.network_name
 }
 
 resource "docker_image" "cassandra" {
   name         = var.cassandra_image
+  keep_locally = true
+}
+
+resource "docker_image" "opscenter" {
+  count        = var.enable_opscenter ? 1 : 0
+  name         = var.opscenter_image
   keep_locally = true
 }
 
@@ -51,6 +45,11 @@ resource "docker_volume" "node_data" {
   name  = "${var.volume_prefix}-node-${count.index + 1}"
 }
 
+resource "docker_volume" "opscenter_data" {
+  count = var.enable_opscenter && var.opscenter_persistent_volume ? 1 : 0
+  name  = var.opscenter_volume_name
+}
+
 resource "docker_container" "seed" {
   name     = var.seed_container_name
   image    = docker_image.cassandra.image_id
@@ -58,7 +57,7 @@ resource "docker_container" "seed" {
   restart  = var.restart_policy
 
   networks_advanced {
-    name    = docker_network.cassandra.name
+    name    = local.cassandra_network_name
     aliases = [var.seed_container_name]
   }
 
@@ -101,7 +100,7 @@ resource "docker_container" "node_1" {
   restart  = var.restart_policy
 
   networks_advanced {
-    name    = docker_network.cassandra.name
+    name    = local.cassandra_network_name
     aliases = ["${var.node_container_name_prefix}-1"]
   }
 
@@ -143,7 +142,7 @@ resource "docker_container" "node_2" {
   restart  = var.restart_policy
 
   networks_advanced {
-    name    = docker_network.cassandra.name
+    name    = local.cassandra_network_name
     aliases = ["${var.node_container_name_prefix}-2"]
   }
 
@@ -185,7 +184,7 @@ resource "docker_container" "node_3" {
   restart  = var.restart_policy
 
   networks_advanced {
-    name    = docker_network.cassandra.name
+    name    = local.cassandra_network_name
     aliases = ["${var.node_container_name_prefix}-3"]
   }
 
@@ -227,7 +226,7 @@ resource "docker_container" "node_4" {
   restart  = var.restart_policy
 
   networks_advanced {
-    name    = docker_network.cassandra.name
+    name    = local.cassandra_network_name
     aliases = ["${var.node_container_name_prefix}-4"]
   }
 
@@ -269,7 +268,7 @@ resource "docker_container" "node_5" {
   restart  = var.restart_policy
 
   networks_advanced {
-    name    = docker_network.cassandra.name
+    name    = local.cassandra_network_name
     aliases = ["${var.node_container_name_prefix}-5"]
   }
 
@@ -311,7 +310,7 @@ resource "docker_container" "node_6" {
   restart  = var.restart_policy
 
   networks_advanced {
-    name    = docker_network.cassandra.name
+    name    = local.cassandra_network_name
     aliases = ["${var.node_container_name_prefix}-6"]
   }
 
@@ -332,4 +331,55 @@ resource "docker_container" "node_6" {
   }
 
   depends_on = [time_sleep.after_node_5_join]
+}
+
+resource "docker_container" "opscenter" {
+  count = var.enable_opscenter ? 1 : 0
+
+  name     = var.opscenter_container_name
+  image    = docker_image.opscenter[0].image_id
+  hostname = var.opscenter_container_name
+  restart  = var.restart_policy
+
+  networks_advanced {
+    name    = local.cassandra_network_name
+    aliases = [var.opscenter_container_name, "opscenter"]
+  }
+
+  env = concat(
+    [
+      "DS_LICENSE=accept",
+      "OPSCENTER_IP=${var.opscenter_container_name}"
+    ],
+    var.opscenter_extra_env
+  )
+
+  ports {
+    internal = 8888
+    external = var.opscenter_ui_port
+  }
+
+  ports {
+    internal = 61620
+    external = var.opscenter_agent_port
+  }
+
+  dynamic "volumes" {
+    for_each = var.opscenter_persistent_volume ? [docker_volume.opscenter_data[0].name] : []
+
+    content {
+      volume_name    = volumes.value
+      container_path = "/var/lib/opscenter"
+    }
+  }
+
+  depends_on = [
+    docker_container.seed,
+    docker_container.node_1,
+    docker_container.node_2,
+    docker_container.node_3,
+    docker_container.node_4,
+    docker_container.node_5,
+    docker_container.node_6
+  ]
 }
