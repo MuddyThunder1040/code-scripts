@@ -26,7 +26,9 @@ pipeline {
     stages {
         stage('Checkout Code') {
             steps {
-                git branch: "${params.Branch}", url: 'https://github.com/MuddyThunder1040/code-scripts.git'
+                git branch: "${params.Branch}",
+                    credentialsId: 'GITHUB_TOKEN',
+                    url: 'https://github.com/MuddyThunder1040/code-scripts.git'
             }
         }
 
