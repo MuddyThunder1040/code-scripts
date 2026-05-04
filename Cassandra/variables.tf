@@ -1,7 +1,18 @@
 variable "cassandra_image" {
-  description = "Docker image used for all Cassandra containers."
+  description = "Docker image used for all Cassandra/DSE containers. OpsCenter requires DataStax Enterprise, not the Apache Cassandra image."
   type        = string
-  default     = "cassandra:4.1"
+  default     = "datastax/dse-server:6.8.48"
+}
+
+variable "cassandra_distribution" {
+  description = "Container distribution to run. Use dse when enable_opscenter is true."
+  type        = string
+  default     = "dse"
+
+  validation {
+    condition     = contains(["apache", "dse"], var.cassandra_distribution)
+    error_message = "cassandra_distribution must be apache or dse."
+  }
 }
 
 variable "cluster_name" {

@@ -1,13 +1,26 @@
 locals {
   cassandra_network_name = var.create_network ? docker_network.cassandra[0].name : data.docker_network.cassandra[0].name
 
-  cassandra_env = [
+  apache_cassandra_env = [
     "CASSANDRA_CLUSTER_NAME=${var.cluster_name}",
     "CASSANDRA_SEEDS=${var.seed_container_name}",
     "CASSANDRA_NUM_TOKENS=${var.num_tokens}",
     "MAX_HEAP_SIZE=${var.max_heap_size}",
     "HEAP_NEWSIZE=${var.heap_new_size}"
   ]
+
+  dse_env = concat(
+    [
+      "DS_LICENSE=accept",
+      "CLUSTER_NAME=${var.cluster_name}",
+      "SEEDS=${var.seed_container_name}",
+      "NUM_TOKENS=${var.num_tokens}",
+      "JVM_EXTRA_OPTS=-Xms${var.heap_new_size} -Xmx${var.max_heap_size}"
+    ],
+    var.enable_opscenter ? ["OPSCENTER_IP=${var.opscenter_container_name}"] : []
+  )
+
+  cassandra_env = var.cassandra_distribution == "dse" ? local.dse_env : local.apache_cassandra_env
 
   cassandra_node_hostnames = concat(
     [var.seed_container_name],
@@ -370,6 +383,13 @@ resource "docker_container" "opscenter" {
     content {
       volume_name    = volumes.value
       container_path = "/var/lib/opscenter"
+    }
+  }
+
+  lifecycle {
+    precondition {
+      condition     = var.cassandra_distribution == "dse"
+      error_message = "OpsCenter only supports DataStax Enterprise clusters. Set cassandra_distribution = \"dse\" and use a datastax/dse-server image, or set enable_opscenter = false."
     }
   }
 

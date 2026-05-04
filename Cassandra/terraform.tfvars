@@ -1,4 +1,5 @@
-cassandra_image            = "cassandra:4.1"
+cassandra_image            = "datastax/dse-server:6.8.48"
+cassandra_distribution     = "dse"
 cluster_name               = "demo-cluster"
 network_name               = "cassandra-network"
 create_network             = true
