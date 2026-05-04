@@ -94,6 +94,22 @@ resource "docker_container" "seed" {
     soft = 100000
     hard = 100000
   }
+
+  ulimit {
+    name = "nproc"
+    soft = 32768
+    hard = 32768
+  }
+
+  ulimit {
+    name = "memlock"
+    soft = -1
+    hard = -1
+  }
+
+  capabilities {
+    add = ["IPC_LOCK"]
+  }
 }
 
 resource "time_sleep" "after_seed_bootstrap" {
@@ -131,6 +147,22 @@ resource "docker_container" "node_1" {
     name = "nofile"
     soft = 100000
     hard = 100000
+  }
+
+  ulimit {
+    name = "nproc"
+    soft = 32768
+    hard = 32768
+  }
+
+  ulimit {
+    name = "memlock"
+    soft = -1
+    hard = -1
+  }
+
+  capabilities {
+    add = ["IPC_LOCK"]
   }
 
   depends_on = [time_sleep.after_seed_bootstrap]
@@ -175,6 +207,22 @@ resource "docker_container" "node_2" {
     hard = 100000
   }
 
+  ulimit {
+    name = "nproc"
+    soft = 32768
+    hard = 32768
+  }
+
+  ulimit {
+    name = "memlock"
+    soft = -1
+    hard = -1
+  }
+
+  capabilities {
+    add = ["IPC_LOCK"]
+  }
+
   depends_on = [time_sleep.after_node_1_join]
 }
 
@@ -215,6 +263,22 @@ resource "docker_container" "node_3" {
     name = "nofile"
     soft = 100000
     hard = 100000
+  }
+
+  ulimit {
+    name = "nproc"
+    soft = 32768
+    hard = 32768
+  }
+
+  ulimit {
+    name = "memlock"
+    soft = -1
+    hard = -1
+  }
+
+  capabilities {
+    add = ["IPC_LOCK"]
   }
 
   depends_on = [time_sleep.after_node_2_join]
@@ -259,6 +323,22 @@ resource "docker_container" "node_4" {
     hard = 100000
   }
 
+  ulimit {
+    name = "nproc"
+    soft = 32768
+    hard = 32768
+  }
+
+  ulimit {
+    name = "memlock"
+    soft = -1
+    hard = -1
+  }
+
+  capabilities {
+    add = ["IPC_LOCK"]
+  }
+
   depends_on = [time_sleep.after_node_3_join]
 }
 
@@ -301,6 +381,22 @@ resource "docker_container" "node_5" {
     hard = 100000
   }
 
+  ulimit {
+    name = "nproc"
+    soft = 32768
+    hard = 32768
+  }
+
+  ulimit {
+    name = "memlock"
+    soft = -1
+    hard = -1
+  }
+
+  capabilities {
+    add = ["IPC_LOCK"]
+  }
+
   depends_on = [time_sleep.after_node_4_join]
 }
 
@@ -341,6 +437,22 @@ resource "docker_container" "node_6" {
     name = "nofile"
     soft = 100000
     hard = 100000
+  }
+
+  ulimit {
+    name = "nproc"
+    soft = 32768
+    hard = 32768
+  }
+
+  ulimit {
+    name = "memlock"
+    soft = -1
+    hard = -1
+  }
+
+  capabilities {
+    add = ["IPC_LOCK"]
   }
 
   depends_on = [time_sleep.after_node_5_join]
