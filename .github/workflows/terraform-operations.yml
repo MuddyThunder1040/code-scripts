@@ -78,7 +78,7 @@ jobs:
         if: inputs.action == 'apply' && inputs.module == 'Cassandra'
         working-directory: ${{ inputs.module }}
         run: |
-          node_count=$(terraform output -no-color node_container_names | grep -c '"cassandra-node-')
+          node_count=$(terraform output -no-color node_container_names | grep -c '"cassandra-node-' || true)
           expected_nodes=$((1 + node_count))
 
           for attempt in $(seq 1 20); do
