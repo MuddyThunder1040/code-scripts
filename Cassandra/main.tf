@@ -30,6 +30,7 @@ locals {
     "CASSANDRA_NUM_TOKENS=${var.num_tokens}",
     "MAX_HEAP_SIZE=${var.max_heap_size}",
     "HEAP_NEWSIZE=${var.heap_new_size}"
+    "LOCAL_JMX=no"
   ]
 }
 
