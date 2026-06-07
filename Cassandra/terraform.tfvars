@@ -36,3 +36,10 @@ reaper_http_port                      = 8085
 reaper_volume_name                    = "cassandra-reaper-data"
 reaper_heap_size                      = "1G"
 reaper_jmx_connection_timeout_seconds = 20
+
+enable_reaper_cluster_registration         = true
+reaper_registration_image                  = "curlimages/curl:8.8.0"
+reaper_cluster_registration_container_name = "reaper-register-cassandra"
+reaper_cluster_registration_wait           = "120s"
+reaper_registration_retries                = 30
+reaper_registration_retry_delay_seconds    = 5

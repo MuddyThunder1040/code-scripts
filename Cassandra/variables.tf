@@ -188,3 +188,39 @@ variable "reaper_jmx_connection_timeout_seconds" {
   type        = number
   default     = 20
 }
+
+variable "enable_reaper_cluster_registration" {
+  description = "Whether Terraform should register the Cassandra cluster in Reaper through Reaper's REST API."
+  type        = bool
+  default     = true
+}
+
+variable "reaper_registration_image" {
+  description = "One-shot curl image used to register the Cassandra cluster in Reaper from the Cassandra Docker network."
+  type        = string
+  default     = "curlimages/curl:8.8.0"
+}
+
+variable "reaper_cluster_registration_container_name" {
+  description = "Name for the one-shot container that registers the Cassandra cluster in Reaper."
+  type        = string
+  default     = "reaper-register-cassandra"
+}
+
+variable "reaper_cluster_registration_wait" {
+  description = "How long Terraform waits after Reaper and Cassandra containers are created before registering the cluster in Reaper."
+  type        = string
+  default     = "120s"
+}
+
+variable "reaper_registration_retries" {
+  description = "Number of HTTP retries used while registering Cassandra in Reaper."
+  type        = number
+  default     = 30
+}
+
+variable "reaper_registration_retry_delay_seconds" {
+  description = "Delay in seconds between Reaper registration HTTP retries."
+  type        = number
+  default     = 5
+}

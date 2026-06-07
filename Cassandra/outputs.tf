@@ -35,6 +35,21 @@ output "reaper_url" {
   value       = "http://127.0.0.1:${var.reaper_http_port}/webui/"
 }
 
+output "reaper_cluster_registration_endpoint" {
+  description = "Reaper API endpoint used to register or refresh the Cassandra cluster."
+  value       = "http://${var.reaper_container_name}:8080/cluster?seedHost=${var.seed_container_name}&jmxPort=${var.cassandra_jmx_port}"
+}
+
+output "reaper_host_cluster_registration_command" {
+  description = "Host command to manually register or refresh the Cassandra cluster in Reaper."
+  value       = "curl --fail --show-error --request POST 'http://127.0.0.1:${var.reaper_http_port}/cluster?seedHost=${var.seed_container_name}&jmxPort=${var.cassandra_jmx_port}'"
+}
+
+output "reaper_host_cluster_list_command" {
+  description = "Host command to list clusters registered in Reaper."
+  value       = "curl --fail --show-error 'http://127.0.0.1:${var.reaper_http_port}/cluster'"
+}
+
 output "cassandra_network_name" {
   description = "Docker network used by Cassandra, Reaper, and future monitoring containers."
   value       = docker_network.cassandra.name

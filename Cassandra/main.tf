@@ -73,6 +73,19 @@ locals {
     "REAPER_CASS_AUTH_ENABLED=false",
     "REAPER_HEAP_SIZE=${var.reaper_heap_size}"
   ]
+
+  reaper_registration_command = [
+    "--fail",
+    "--show-error",
+    "--silent",
+    "--retry",
+    tostring(var.reaper_registration_retries),
+    "--retry-delay",
+    tostring(var.reaper_registration_retry_delay_seconds),
+    "--request",
+    "POST",
+    "http://${var.reaper_container_name}:8080/cluster?seedHost=${var.seed_container_name}&jmxPort=${var.cassandra_jmx_port}"
+  ]
 }
 
 resource "docker_network" "cassandra" {
@@ -86,6 +99,13 @@ resource "docker_image" "cassandra" {
 
 resource "docker_image" "reaper" {
   name         = var.reaper_image
+  keep_locally = true
+}
+
+resource "docker_image" "reaper_registration" {
+  count = var.enable_reaper_cluster_registration ? 1 : 0
+
+  name         = var.reaper_registration_image
   keep_locally = true
 }
 
@@ -465,4 +485,50 @@ resource "docker_container" "reaper" {
   }
 
   depends_on = [time_sleep.after_seed_bootstrap]
+}
+
+resource "time_sleep" "before_reaper_cluster_registration" {
+  count = var.enable_reaper_cluster_registration ? 1 : 0
+
+  create_duration = var.reaper_cluster_registration_wait
+
+  triggers = {
+    reaper_container_id = docker_container.reaper.id
+    seed_container_id   = docker_container.seed.id
+    node_ids = join(",", concat(
+      docker_container.node_1[*].id,
+      docker_container.node_2[*].id,
+      docker_container.node_3[*].id,
+      docker_container.node_4[*].id,
+      docker_container.node_5[*].id,
+      docker_container.node_6[*].id
+    ))
+  }
+
+  depends_on = [
+    docker_container.reaper,
+    docker_container.node_1,
+    docker_container.node_2,
+    docker_container.node_3,
+    docker_container.node_4,
+    docker_container.node_5,
+    docker_container.node_6
+  ]
+}
+
+resource "docker_container" "reaper_cluster_registration" {
+  count = var.enable_reaper_cluster_registration ? 1 : 0
+
+  name     = var.reaper_cluster_registration_container_name
+  image    = docker_image.reaper_registration[0].image_id
+  hostname = var.reaper_cluster_registration_container_name
+  must_run = false
+  restart  = "no"
+  command  = local.reaper_registration_command
+
+  networks_advanced {
+    name = docker_network.cassandra.name
+  }
+
+  depends_on = [time_sleep.before_reaper_cluster_registration]
 }
