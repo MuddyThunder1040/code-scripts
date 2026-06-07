@@ -63,6 +63,60 @@ variable "seed_cql_port" {
   default     = 9042
 }
 
+variable "cassandra_jmx_port" {
+  description = "Internal JMX/RMI port used by every Cassandra container."
+  type        = number
+  default     = 7199
+}
+
+variable "seed_jmx_port" {
+  description = "Host port mapped to the seed container JMX port."
+  type        = number
+  default     = 7199
+}
+
+variable "jmx_host_bind_ip" {
+  description = "Host interface used for published Cassandra JMX ports. Use 0.0.0.0 only when protected by firewall/VPN."
+  type        = string
+  default     = "127.0.0.1"
+}
+
+variable "node_1_jmx_port" {
+  description = "Host port mapped to cassandra-node-1 JMX."
+  type        = number
+  default     = 7200
+}
+
+variable "node_2_jmx_port" {
+  description = "Host port mapped to cassandra-node-2 JMX."
+  type        = number
+  default     = 7201
+}
+
+variable "node_3_jmx_port" {
+  description = "Host port mapped to cassandra-node-3 JMX."
+  type        = number
+  default     = 7202
+}
+
+variable "node_4_jmx_port" {
+  description = "Host port mapped to cassandra-node-4 JMX."
+  type        = number
+  default     = 7203
+}
+
+variable "node_5_jmx_port" {
+  description = "Host port mapped to cassandra-node-5 JMX."
+  type        = number
+  default     = 7204
+}
+
+variable "node_6_jmx_port" {
+  description = "Host port mapped to cassandra-node-6 JMX."
+  type        = number
+  default     = 7205
+}
+
 variable "container_memory_mb" {
   description = "Memory limit per Cassandra container in MB."
   type        = number
@@ -97,4 +151,40 @@ variable "restart_policy" {
   description = "Docker restart policy for Cassandra containers."
   type        = string
   default     = "unless-stopped"
+}
+
+variable "reaper_image" {
+  description = "Docker image used for Cassandra Reaper."
+  type        = string
+  default     = "thelastpickle/cassandra-reaper:latest"
+}
+
+variable "reaper_container_name" {
+  description = "Name and Docker DNS alias for the Cassandra Reaper container."
+  type        = string
+  default     = "reaper"
+}
+
+variable "reaper_http_port" {
+  description = "Host port mapped to the Reaper HTTP UI port 8080."
+  type        = number
+  default     = 8085
+}
+
+variable "reaper_volume_name" {
+  description = "Docker volume name used for persistent Reaper local storage."
+  type        = string
+  default     = "cassandra-reaper-data"
+}
+
+variable "reaper_heap_size" {
+  description = "JVM heap size for the Reaper process."
+  type        = string
+  default     = "1G"
+}
+
+variable "reaper_jmx_connection_timeout_seconds" {
+  description = "Timeout in seconds for Reaper JMX connections to Cassandra nodes."
+  type        = number
+  default     = 20
 }

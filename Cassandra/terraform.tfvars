@@ -12,6 +12,15 @@ max_heap_size = "2G"
 heap_new_size = "512M"
 
 seed_cql_port       = 9042
+cassandra_jmx_port  = 7199
+seed_jmx_port       = 7199
+jmx_host_bind_ip    = "127.0.0.1"
+node_1_jmx_port     = 7200
+node_2_jmx_port     = 7201
+node_3_jmx_port     = 7202
+node_4_jmx_port     = 7203
+node_5_jmx_port     = 7204
+node_6_jmx_port     = 7205
 container_memory_mb = 4096
 container_cpus      = "1.0"
 
@@ -20,3 +29,10 @@ node_join_wait_seconds = 180
 
 volume_prefix  = "cassandra-data"
 restart_policy = "unless-stopped"
+
+reaper_image                          = "thelastpickle/cassandra-reaper:latest"
+reaper_container_name                 = "reaper"
+reaper_http_port                      = 8085
+reaper_volume_name                    = "cassandra-reaper-data"
+reaper_heap_size                      = "1G"
+reaper_jmx_connection_timeout_seconds = 20
