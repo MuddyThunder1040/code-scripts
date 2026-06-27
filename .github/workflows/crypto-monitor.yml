@@ -1,0 +1,141 @@
+name: Crypto Monitor
+
+on:
+  push:
+    branches: [main]
+    paths: [.github/workflows/crypto-monitor.yml]
+  repository_dispatch:
+    types: [crypto-monitor-deploy]
+  workflow_dispatch:
+
+jobs:
+  test:
+    name: Lint + Unit tests
+    runs-on: [self-hosted, Linux, X64]
+    steps:
+      - name: Checkout app
+        uses: actions/checkout@v4
+        with:
+          repository: MuddyThunder1040/literate-octo-palm-tree
+          path: app
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install dependencies
+        working-directory: app
+        run: pip install -r requirements-dev.txt ruff
+
+      - name: Lint
+        working-directory: app
+        run: ruff check .
+
+      - name: Unit tests
+        working-directory: app
+        run: pytest tests/unit/ -v
+
+  deploy-dev:
+    name: Deploy → dev
+    needs: test
+    runs-on: [self-hosted, Linux, X64]
+    environment: dev
+
+    steps:
+      - name: Checkout app
+        uses: actions/checkout@v4
+        with:
+          repository: MuddyThunder1040/literate-octo-palm-tree
+          path: app
+
+      - name: Build image
+        working-directory: app
+        run: docker build -t crypto-monitor:dev .
+
+      - name: Deploy dev container
+        run: |
+          docker rm -f crypto-monitor-dev 2>/dev/null || true
+          docker run -d \
+            --name crypto-monitor-dev \
+            --restart unless-stopped \
+            -p 8001:8000 \
+            -e CASSANDRA_HOSTS=100.64.213.62 \
+            -e CASSANDRA_KEYSPACE=crypto_market \
+            -e CRYPTO_AUTO_INGEST_SECONDS=30 \
+            --network homelab-net \
+            crypto-monitor:dev
+
+      - name: Wait for startup
+        run: |
+          for i in $(seq 1 20); do
+            curl -sf http://localhost:8001/api/cluster/health && exit 0
+            sleep 3
+          done
+          echo "Dev did not become healthy" && exit 1
+
+  integration-test:
+    name: Integration tests → dev
+    needs: deploy-dev
+    runs-on: [self-hosted, Linux, X64]
+    steps:
+      - name: Checkout app
+        uses: actions/checkout@v4
+        with:
+          repository: MuddyThunder1040/literate-octo-palm-tree
+          path: app
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install dependencies
+        working-directory: app
+        run: pip install -r requirements-dev.txt
+
+      - name: Run integration tests
+        working-directory: app
+        env:
+          APP_URL: http://localhost:8001
+        run: pytest tests/integration/ -v
+
+  promote-prod:
+    name: Promote → prod
+    needs: integration-test
+    runs-on: [self-hosted, Linux, X64]
+    environment: prod
+
+    steps:
+      - name: Promote image
+        run: docker tag crypto-monitor:dev crypto-monitor:prod
+
+      - name: Deploy prod container
+        run: |
+          docker rm -f crypto-monitor-prod 2>/dev/null || true
+          docker run -d \
+            --name crypto-monitor-prod \
+            --restart unless-stopped \
+            -p 8000:8000 \
+            -e CASSANDRA_HOSTS=100.64.213.62 \
+            -e CASSANDRA_KEYSPACE=crypto_market \
+            -e CRYPTO_AUTO_INGEST_SECONDS=60 \
+            --network homelab-net \
+            crypto-monitor:prod
+
+      - name: Smoke test prod
+        run: |
+          for i in $(seq 1 20); do
+            curl -sf http://localhost:8000/api/cluster/health && exit 0
+            sleep 3
+          done
+          echo "Prod did not become healthy" && exit 1
+
+      - name: Notify Slack
+        run: |
+          curl -s -X POST -H 'Content-type: application/json' \
+            --data '{
+              "attachments": [{
+                "color": "good",
+                "text": "crypto-monitor promoted to prod (${{ github.sha }})."
+              }]
+            }' \
+            "${{ secrets.SLACK_WEBHOOK_URL }}"
