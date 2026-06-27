@@ -1,0 +1,5 @@
+homelab_user: vishnu
+dell_tailscale_ip: 100.87.212.105
+desktop_tailscale_ip: 100.64.213.62
+docker_network: homelab-net
+registry_url: 100.87.212.105:5000

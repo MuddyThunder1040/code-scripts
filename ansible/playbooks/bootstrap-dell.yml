@@ -1,0 +1,112 @@
+---
+- name: Bootstrap Dell infra node
+  hosts: dell
+  become: true
+
+  tasks:
+    - name: Ensure Docker service is running
+      ansible.builtin.systemd:
+        name: docker
+        state: started
+        enabled: true
+
+    - name: Create /data/services subdirectories
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: directory
+        owner: "{{ homelab_user }}"
+        group: "{{ homelab_user }}"
+        mode: "0755"
+      loop:
+        - /data/services/traefik/dynamic
+        - /data/services/traefik/certs
+        - /data/services/monitoring/prometheus
+        - /data/services/monitoring/grafana
+        - /data/services/monitoring/loki
+        - /data/services/jenkins
+        - /data/services/gitea
+        - /data/services/registry
+        - /data/services/portainer
+
+    - name: Create homelab-net Docker network
+      community.docker.docker_network:
+        name: homelab-net
+        state: present
+
+    - name: Copy dell/services compose files to /data/services
+      ansible.builtin.copy:
+        src: "{{ playbook_dir }}/../../dell/services/{{ item }}"
+        dest: "/data/services/{{ item }}"
+        owner: "{{ homelab_user }}"
+        group: "{{ homelab_user }}"
+        mode: "0644"
+      loop:
+        - proxy/compose.yml
+        - monitoring/compose.yml
+        - monitoring/prometheus.yml
+        - ci/compose.yml
+        - registry/compose.yml
+        - portainer/compose.yml
+
+    - name: Install node-exporter
+      ansible.builtin.apt:
+        name: prometheus-node-exporter
+        state: present
+        update_cache: true
+
+    - name: Ensure node-exporter is running
+      ansible.builtin.systemd:
+        name: prometheus-node-exporter
+        state: started
+        enabled: true
+
+    - name: Install promtail
+      ansible.builtin.apt:
+        name: promtail
+        state: present
+
+    - name: Ensure promtail is running
+      ansible.builtin.systemd:
+        name: promtail
+        state: started
+        enabled: true
+
+    - name: Install UFW
+      ansible.builtin.apt:
+        name: ufw
+        state: present
+
+    - name: Allow SSH from anywhere
+      community.general.ufw:
+        rule: allow
+        port: "22"
+        proto: tcp
+
+    - name: Allow HTTP from anywhere
+      community.general.ufw:
+        rule: allow
+        port: "80"
+        proto: tcp
+
+    - name: Allow HTTPS from anywhere
+      community.general.ufw:
+        rule: allow
+        port: "443"
+        proto: tcp
+
+    - name: Allow monitoring and service ports from Tailscale subnet only
+      community.general.ufw:
+        rule: allow
+        port: "{{ item }}"
+        proto: tcp
+        src: 100.64.0.0/10
+      loop:
+        - "9100"
+        - "8080"
+        - "3000"
+        - "9090"
+
+    - name: Enable UFW
+      community.general.ufw:
+        state: enabled
+        policy: deny

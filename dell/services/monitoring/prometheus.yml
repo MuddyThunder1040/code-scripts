@@ -1,0 +1,40 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+scrape_configs:
+  - job_name: dell-node-exporter
+    static_configs:
+      - targets: ['localhost:9100']
+        labels:
+          host: dell
+
+  - job_name: desktop-node-exporter
+    static_configs:
+      - targets: ['100.64.213.62:9100']
+        labels:
+          host: desktop-wsl2
+
+  - job_name: dell-cadvisor
+    static_configs:
+      - targets: ['localhost:8888']
+        labels:
+          host: dell
+
+  - job_name: desktop-cadvisor
+    static_configs:
+      - targets: ['100.64.213.62:8888']
+        labels:
+          host: desktop-wsl2
+
+  - job_name: jenkins
+    static_configs:
+      - targets: ['localhost:8080']
+        labels:
+          host: dell
+
+  - job_name: traefik
+    static_configs:
+      - targets: ['localhost:8082']
+        labels:
+          host: dell

@@ -1,0 +1,54 @@
+---
+- name: Deploy Traefik reverse proxy on Dell
+  hosts: dell
+  become: true
+
+  vars:
+    proxy_dir: /data/services/proxy
+    traefik_dir: /data/services/traefik
+
+  tasks:
+    - name: Create Traefik config directories
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: directory
+        owner: "{{ homelab_user }}"
+        group: "{{ homelab_user }}"
+        mode: "0755"
+      loop:
+        - "{{ traefik_dir }}/dynamic"
+        - "{{ traefik_dir }}/certs"
+        - "{{ proxy_dir }}"
+
+    - name: Copy proxy compose file to Dell
+      ansible.builtin.copy:
+        src: "{{ playbook_dir }}/../../dell/services/proxy/compose.yml"
+        dest: "{{ proxy_dir }}/compose.yml"
+        owner: "{{ homelab_user }}"
+        group: "{{ homelab_user }}"
+        mode: "0644"
+
+    - name: Create homelab-net network
+      community.docker.docker_network:
+        name: homelab-net
+        state: present
+
+    - name: Run docker compose up for Traefik
+      community.docker.docker_compose_v2:
+        project_src: "{{ proxy_dir }}"
+        state: present
+        pull: always
+      become_user: "{{ homelab_user }}"
+
+    - name: Wait for Traefik dashboard to be accessible
+      ansible.builtin.uri:
+        url: http://localhost:8080/api/rawdata
+        status_code: 200
+      register: traefik_health
+      until: traefik_health.status == 200
+      retries: 15
+      delay: 5
+
+    - name: Report Traefik status
+      ansible.builtin.debug:
+        msg: "Traefik dashboard is accessible (status={{ traefik_health.status }})"

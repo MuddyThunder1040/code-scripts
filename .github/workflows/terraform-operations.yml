@@ -17,10 +17,18 @@ on:
         required: true
         type: choice
         options: [plan, apply, show, destroy, validate, init]
+      target:
+        description: 'Deployment target'
+        required: true
+        type: choice
+        default: desktop-wsl
+        options: [desktop-wsl, dell]
 
 jobs:
   terraform:
     runs-on: [self-hosted, Linux, X64]
+    env:
+      TF_VAR_docker_host: ${{ inputs.target == 'dell' && 'unix:///var/run/docker.sock' || 'tcp://100.64.213.62:2375' }}
 
     steps:
       - name: Checkout code

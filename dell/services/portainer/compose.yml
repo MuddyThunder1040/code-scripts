@@ -1,0 +1,20 @@
+services:
+  portainer:
+    image: portainer/portainer-ce:latest
+    container_name: portainer
+    restart: unless-stopped
+    ports:
+      - "9000:9000"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - /data/services/portainer:/data
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.portainer.rule=Host(`portainer.homelab.local`)"
+      - "traefik.http.services.portainer.loadbalancer.server.port=9000"
+    networks:
+      - homelab-net
+
+networks:
+  homelab-net:
+    external: true

@@ -1,0 +1,90 @@
+services:
+  cassandra-seed:
+    image: cassandra:5.0
+    container_name: cassandra-seed
+    hostname: cassandra-seed
+    restart: unless-stopped
+    environment:
+      - CASSANDRA_CLUSTER_NAME=homelab-cluster
+      - CASSANDRA_SEEDS=cassandra-seed
+      - CASSANDRA_NUM_TOKENS=16
+      - MAX_HEAP_SIZE=512M
+      - HEAP_NEWSIZE=128M
+      - LOCAL_JMX=no
+    ports:
+      - "9042:9042"
+    volumes:
+      - cassandra-seed-data:/var/lib/cassandra
+    deploy:
+      resources:
+        limits:
+          memory: 1g
+    ulimits:
+      nofile:
+        soft: 100000
+        hard: 100000
+    networks:
+      - cass-net
+
+  cassandra-node-1:
+    image: cassandra:5.0
+    container_name: cassandra-node-1
+    hostname: cassandra-node-1
+    restart: unless-stopped
+    environment:
+      - CASSANDRA_CLUSTER_NAME=homelab-cluster
+      - CASSANDRA_SEEDS=cassandra-seed
+      - CASSANDRA_NUM_TOKENS=16
+      - MAX_HEAP_SIZE=512M
+      - HEAP_NEWSIZE=128M
+      - LOCAL_JMX=no
+    volumes:
+      - cassandra-node-1-data:/var/lib/cassandra
+    deploy:
+      resources:
+        limits:
+          memory: 1g
+    ulimits:
+      nofile:
+        soft: 100000
+        hard: 100000
+    depends_on:
+      - cassandra-seed
+    networks:
+      - cass-net
+
+  cassandra-node-2:
+    image: cassandra:5.0
+    container_name: cassandra-node-2
+    hostname: cassandra-node-2
+    restart: unless-stopped
+    environment:
+      - CASSANDRA_CLUSTER_NAME=homelab-cluster
+      - CASSANDRA_SEEDS=cassandra-seed
+      - CASSANDRA_NUM_TOKENS=16
+      - MAX_HEAP_SIZE=512M
+      - HEAP_NEWSIZE=128M
+      - LOCAL_JMX=no
+    volumes:
+      - cassandra-node-2-data:/var/lib/cassandra
+    deploy:
+      resources:
+        limits:
+          memory: 1g
+    ulimits:
+      nofile:
+        soft: 100000
+        hard: 100000
+    depends_on:
+      - cassandra-node-1
+    networks:
+      - cass-net
+
+volumes:
+  cassandra-seed-data:
+  cassandra-node-1-data:
+  cassandra-node-2-data:
+
+networks:
+  cass-net:
+    driver: bridge

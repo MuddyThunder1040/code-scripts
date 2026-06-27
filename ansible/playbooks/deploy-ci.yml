@@ -1,0 +1,37 @@
+---
+- name: Deploy CI stack (Jenkins + Gitea) on Dell
+  hosts: dell
+  become: false
+
+  vars:
+    ci_dir: /data/services/ci
+
+  tasks:
+    - name: Copy CI compose files to Dell
+      ansible.builtin.copy:
+        src: "{{ playbook_dir }}/../../dell/services/ci/compose.yml"
+        dest: "{{ ci_dir }}/compose.yml"
+        mode: "0644"
+      become: true
+
+    - name: Run docker compose up for Jenkins and Gitea
+      community.docker.docker_compose_v2:
+        project_src: "{{ ci_dir }}"
+        state: present
+        pull: always
+
+    - name: Wait for Jenkins to be healthy
+      ansible.builtin.uri:
+        url: http://localhost:8080/login
+        status_code: 200
+      register: jenkins_health
+      until: jenkins_health.status == 200
+      retries: 20
+      delay: 15
+
+    - name: Print Jenkins initial admin password location
+      ansible.builtin.debug:
+        msg: >
+          Jenkins is ready. Initial admin password is at:
+          /data/services/jenkins/secrets/initialAdminPassword
+          Run: docker exec jenkins cat /var/jenkins_home/secrets/initialAdminPassword

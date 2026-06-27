@@ -1,0 +1,17 @@
+services:
+  registry:
+    image: registry:2
+    container_name: registry
+    restart: unless-stopped
+    ports:
+      - "5000:5000"
+    volumes:
+      - /data/services/registry:/var/lib/registry
+    environment:
+      - REGISTRY_STORAGE_FILESYSTEM_ROOTDIRECTORY=/var/lib/registry
+    networks:
+      - homelab-net
+
+networks:
+  homelab-net:
+    external: true

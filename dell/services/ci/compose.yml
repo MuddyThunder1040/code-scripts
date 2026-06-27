@@ -1,0 +1,46 @@
+services:
+  jenkins:
+    image: jenkins/jenkins:lts
+    container_name: jenkins
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+      - "50000:50000"
+    volumes:
+      - /data/services/jenkins:/var/jenkins_home
+      - /var/run/docker.sock:/var/run/docker.sock
+    environment:
+      - JAVA_OPTS=-Djenkins.install.runSetupWizard=false
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.jenkins.rule=Host(`jenkins.homelab.local`)"
+      - "traefik.http.services.jenkins.loadbalancer.server.port=8080"
+    networks:
+      - homelab-net
+
+  gitea:
+    image: gitea/gitea:latest
+    container_name: gitea
+    restart: unless-stopped
+    ports:
+      - "3001:3000"
+      - "222:22"
+    volumes:
+      - /data/services/gitea:/data
+    environment:
+      - USER_UID=1000
+      - USER_GID=1000
+      - GITEA__database__DB_TYPE=sqlite3
+      - GITEA__server__HTTP_PORT=3000
+      - GITEA__server__SSH_PORT=222
+      - GITEA__server__DOMAIN=gitea.homelab.local
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.gitea.rule=Host(`gitea.homelab.local`)"
+      - "traefik.http.services.gitea.loadbalancer.server.port=3000"
+    networks:
+      - homelab-net
+
+networks:
+  homelab-net:
+    external: true

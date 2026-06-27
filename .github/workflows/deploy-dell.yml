@@ -1,0 +1,70 @@
+name: Deploy Dell Services
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'dell/**'
+
+jobs:
+  deploy:
+    runs-on: [self-hosted, Linux, X64]
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Copy changed service compose files to /data/services
+        run: |
+          for service in proxy monitoring ci registry portainer; do
+            src="dell/services/${service}"
+            dst="/data/services/${service}"
+            if [ -d "${src}" ]; then
+              mkdir -p "${dst}"
+              cp -r "${src}/." "${dst}/"
+            fi
+          done
+
+      - name: Bring up affected services
+        run: |
+          for service in proxy monitoring ci registry portainer; do
+            compose="/data/services/${service}/compose.yml"
+            if [ -f "${compose}" ]; then
+              docker compose -f "${compose}" up -d
+            fi
+          done
+
+      - name: Verify containers are healthy
+        run: |
+          sleep 15
+          unhealthy=$(docker ps --filter "health=unhealthy" --format "{{.Names}}")
+          if [ -n "${unhealthy}" ]; then
+            echo "Unhealthy containers: ${unhealthy}"
+            exit 1
+          fi
+          echo "All containers healthy"
+
+      - name: Notify Slack (success)
+        if: success()
+        run: |
+          curl -s -X POST -H 'Content-type: application/json' \
+            --data '{
+              "attachments": [{
+                "color": "good",
+                "text": "Dell services deployed successfully from branch ${{ github.ref_name }} (commit ${{ github.sha }})."
+              }]
+            }' \
+            "${{ secrets.SLACK_WEBHOOK_URL }}"
+
+      - name: Notify Slack (failure)
+        if: failure()
+        run: |
+          curl -s -X POST -H 'Content-type: application/json' \
+            --data '{
+              "attachments": [{
+                "color": "danger",
+                "text": "Dell services deployment failed on branch ${{ github.ref_name }} (commit ${{ github.sha }})."
+              }]
+            }' \
+            "${{ secrets.SLACK_WEBHOOK_URL }}"

@@ -1,0 +1,105 @@
+---
+- name: Bootstrap Desktop WSL2 compute node
+  hosts: desktop_wsl
+  become: false
+
+  tasks:
+    - name: Ensure Docker service is running
+      ansible.builtin.systemd:
+        name: docker
+        state: started
+        enabled: true
+      become: true
+
+    - name: Create ~/homelab/docker subdirectories
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: directory
+        mode: "0755"
+      loop:
+        - ~/homelab/docker/cassandra
+        - ~/homelab/docker/databases
+        - ~/homelab/docker/kafka
+        - ~/homelab/docker/ai
+        - ~/homelab/docker/storage
+
+    - name: Create homelab-net Docker network
+      community.docker.docker_network:
+        name: homelab-net
+        state: present
+
+    - name: Copy desktop/services compose files to ~/homelab/docker
+      ansible.builtin.copy:
+        src: "{{ playbook_dir }}/../../desktop/services/{{ item }}"
+        dest: "~/homelab/docker/{{ item }}"
+        mode: "0644"
+      loop:
+        - cassandra/compose.yml
+        - databases/compose.yml
+        - kafka/compose.yml
+        - ai/compose.yml
+        - storage/compose.yml
+
+    - name: Install node-exporter
+      ansible.builtin.apt:
+        name: prometheus-node-exporter
+        state: present
+        update_cache: true
+      become: true
+
+    - name: Ensure node-exporter is running
+      ansible.builtin.systemd:
+        name: prometheus-node-exporter
+        state: started
+        enabled: true
+      become: true
+
+    - name: Install promtail
+      ansible.builtin.apt:
+        name: promtail
+        state: present
+      become: true
+
+    - name: Ensure promtail is running
+      ansible.builtin.systemd:
+        name: promtail
+        state: started
+        enabled: true
+      become: true
+
+    - name: Configure Docker daemon for remote TCP access on 0.0.0.0:2375
+      ansible.builtin.copy:
+        dest: /etc/docker/daemon.json
+        content: |
+          {
+            "hosts": ["unix:///var/run/docker.sock", "tcp://0.0.0.0:2375"]
+          }
+        mode: "0644"
+      become: true
+      notify: Restart Docker
+
+    - name: Configure Docker systemd service to not pass -H flag
+      ansible.builtin.file:
+        path: /etc/systemd/system/docker.service.d
+        state: directory
+        mode: "0755"
+      become: true
+
+    - name: Override Docker service to remove default -H flag
+      ansible.builtin.copy:
+        dest: /etc/systemd/system/docker.service.d/override.conf
+        content: |
+          [Service]
+          ExecStart=
+          ExecStart=/usr/bin/dockerd
+        mode: "0644"
+      become: true
+      notify: Restart Docker
+
+  handlers:
+    - name: Restart Docker
+      ansible.builtin.systemd:
+        name: docker
+        state: restarted
+        daemon_reload: true
+      become: true
