@@ -1,5 +1,4 @@
 from cassandra.cluster import Cluster
-from cassandra.policies import WhitelistRoundRobinPolicy
 from app.config import settings
 
 _session = None
@@ -11,11 +10,8 @@ def get_session():
         cluster = Cluster(
             contact_points=settings.cassandra_hosts.split(","),
             port=settings.cassandra_port,
-            # ponytail: whitelist policy — only seed is reachable from Dell (nodes 1+2
-            # publish no CQL port). Upgrade to DCAwareRoundRobin if CQL ports are opened.
-            load_balancing_policy=WhitelistRoundRobinPolicy(
-                settings.cassandra_hosts.split(",")
-            ),
+            # ponytail: only seed (100.64.213.62) has CQL port exposed from Dell.
+            # Driver marks unreachable peers DOWN and uses only the seed — fine for homelab.
         )
         _session = cluster.connect()
         _bootstrap(_session)
