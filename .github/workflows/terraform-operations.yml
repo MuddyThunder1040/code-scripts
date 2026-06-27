@@ -7,7 +7,7 @@ on:
         description: 'Terraform module directory'
         required: true
         type: choice
-        options: [Cassandra, Portainer, Local, Docker, Localstack]
+        options: [Cassandra, Portainer, Traefik, Local, Docker, Localstack]
       branch:
         description: 'Git branch to use' 
         required: true
@@ -71,6 +71,14 @@ jobs:
         run: |
           docker rm -f portainer 2>/dev/null || true
           echo "Cleaned up conflicting Portainer container"
+
+      - name: Clean up Traefik Docker conflicts
+        if: inputs.action == 'apply' && inputs.module == 'Traefik'
+        env:
+          DOCKER_HOST: ${{ env.TF_VAR_docker_host }}
+        run: |
+          docker rm -f traefik 2>/dev/null || true
+          echo "Cleaned up conflicting Traefik container"
 
       - name: Clean up Docker resources (if needed)
         if: inputs.action == 'apply' && inputs.module == 'Docker'
