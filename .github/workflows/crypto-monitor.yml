@@ -8,6 +8,10 @@ on:
     types: [crypto-monitor-deploy]
   workflow_dispatch:
 
+env:
+  DESKTOP_IP: 100.64.213.62
+  DESKTOP_DOCKER: tcp://100.64.213.62:2375
+
 jobs:
   test:
     name: Lint + Unit tests
@@ -36,7 +40,7 @@ jobs:
         run: pytest tests/unit/ -v
 
   deploy-dev:
-    name: Deploy → dev
+    name: Deploy → dev (Desktop WSL2)
     needs: test
     runs-on: [self-hosted, Linux, X64]
     environment: dev
@@ -48,11 +52,25 @@ jobs:
           repository: MuddyThunder1040/literate-octo-palm-tree
           path: app
 
-      - name: Build image
+      - name: Setup SSH key
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.HOMELAB_DEPLOY_KEY }}" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -H ${{ env.DESKTOP_IP }} >> ~/.ssh/known_hosts 2>/dev/null
+
+      - name: Build image on Dell
         working-directory: app
         run: docker build -t crypto-monitor:dev .
 
-      - name: Deploy dev container
+      - name: Transfer image to Desktop
+        run: |
+          docker save crypto-monitor:dev \
+            | ssh -i ~/.ssh/deploy_key vishnu@${{ env.DESKTOP_IP }} docker load
+
+      - name: Deploy dev container on Desktop
+        env:
+          DOCKER_HOST: ${{ env.DESKTOP_DOCKER }}
         run: |
           docker ps -q --filter "publish=8001" | xargs -r docker rm -f
           docker rm -f crypto-monitor-dev 2>/dev/null || true
@@ -60,19 +78,22 @@ jobs:
             --name crypto-monitor-dev \
             --restart unless-stopped \
             -p 8001:8000 \
-            -e CASSANDRA_HOSTS=100.64.213.62 \
+            -e CASSANDRA_HOSTS=${{ env.DESKTOP_IP }} \
             -e CASSANDRA_KEYSPACE=crypto_market \
             -e CRYPTO_AUTO_INGEST_SECONDS=30 \
-            --network homelab-net \
             crypto-monitor:dev
 
       - name: Wait for startup
         run: |
           for i in $(seq 1 20); do
-            curl -sf http://localhost:8001/api/cluster/health && exit 0
+            curl -sf http://${{ env.DESKTOP_IP }}:8001/api/cluster/health && exit 0
             sleep 3
           done
           echo "Dev did not become healthy" && exit 1
+
+      - name: Cleanup SSH key
+        if: always()
+        run: rm -f ~/.ssh/deploy_key
 
   integration-test:
     name: Integration tests → dev
@@ -96,20 +117,32 @@ jobs:
       - name: Run integration tests
         working-directory: app
         env:
-          APP_URL: http://localhost:8001
+          APP_URL: http://${{ env.DESKTOP_IP }}:8001
         run: pytest tests/integration/ -v
 
   promote-prod:
-    name: Promote → prod
+    name: Promote → prod (Desktop WSL2)
     needs: integration-test
     runs-on: [self-hosted, Linux, X64]
     environment: prod
 
     steps:
-      - name: Promote image
-        run: docker tag crypto-monitor:dev crypto-monitor:prod
+      - name: Setup SSH key
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.HOMELAB_DEPLOY_KEY }}" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -H ${{ env.DESKTOP_IP }} >> ~/.ssh/known_hosts 2>/dev/null
 
-      - name: Deploy prod container
+      - name: Tag and transfer prod image
+        run: |
+          docker tag crypto-monitor:dev crypto-monitor:prod
+          docker save crypto-monitor:prod \
+            | ssh -i ~/.ssh/deploy_key vishnu@${{ env.DESKTOP_IP }} docker load
+
+      - name: Deploy prod container on Desktop
+        env:
+          DOCKER_HOST: ${{ env.DESKTOP_DOCKER }}
         run: |
           docker ps -q --filter "publish=8000" | xargs -r docker rm -f
           docker rm -f crypto-monitor-prod 2>/dev/null || true
@@ -117,19 +150,22 @@ jobs:
             --name crypto-monitor-prod \
             --restart unless-stopped \
             -p 8000:8000 \
-            -e CASSANDRA_HOSTS=100.64.213.62 \
+            -e CASSANDRA_HOSTS=${{ env.DESKTOP_IP }} \
             -e CASSANDRA_KEYSPACE=crypto_market \
             -e CRYPTO_AUTO_INGEST_SECONDS=60 \
-            --network homelab-net \
             crypto-monitor:prod
 
       - name: Smoke test prod
         run: |
           for i in $(seq 1 20); do
-            curl -sf http://localhost:8000/api/cluster/health && exit 0
+            curl -sf http://${{ env.DESKTOP_IP }}:8000/api/cluster/health && exit 0
             sleep 3
           done
           echo "Prod did not become healthy" && exit 1
+
+      - name: Cleanup SSH key
+        if: always()
+        run: rm -f ~/.ssh/deploy_key
 
       - name: Notify Slack
         run: |
@@ -137,7 +173,7 @@ jobs:
             --data '{
               "attachments": [{
                 "color": "good",
-                "text": "crypto-monitor promoted to prod (${{ github.sha }})."
+                "text": "crypto-monitor promoted to prod on Desktop WSL2 (${{ github.sha }})."
               }]
             }' \
             "${{ secrets.SLACK_WEBHOOK_URL }}"
