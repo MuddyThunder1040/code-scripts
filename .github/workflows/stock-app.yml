@@ -1,0 +1,127 @@
+name: Stock App
+
+on:
+  push:
+    branches: [main]
+    paths: [stock-app/**]
+  pull_request:
+    paths: [stock-app/**]
+  workflow_dispatch:
+
+jobs:
+  test:
+    name: Lint + Unit tests
+    runs-on: [self-hosted, Linux, X64]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install dependencies
+        working-directory: stock-app
+        run: pip install -r requirements.txt ruff
+
+      - name: Lint
+        working-directory: stock-app
+        run: ruff check app/
+
+      - name: Unit tests
+        working-directory: stock-app
+        run: pytest tests/unit/ -v
+
+  deploy-dev:
+    name: Deploy → dev
+    needs: test
+    if: github.ref == 'refs/heads/main'
+    runs-on: [self-hosted, Linux, X64]
+    environment: dev
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build image
+        working-directory: stock-app
+        run: docker build -t stock-app:dev .
+
+      - name: Deploy dev container
+        run: |
+          docker rm -f stock-app-dev 2>/dev/null || true
+          docker run -d \
+            --name stock-app-dev \
+            --restart unless-stopped \
+            -p 8001:8000 \
+            -e CASSANDRA_HOSTS=100.64.213.62 \
+            --network homelab-net \
+            stock-app:dev
+
+      - name: Wait for startup
+        run: |
+          for i in $(seq 1 15); do
+            curl -sf http://localhost:8001/health && exit 0
+            sleep 3
+          done
+          echo "Dev deployment did not become healthy" && exit 1
+
+  integration-test:
+    name: Integration tests → dev
+    needs: deploy-dev
+    runs-on: [self-hosted, Linux, X64]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install dependencies
+        working-directory: stock-app
+        run: pip install -r requirements.txt
+
+      - name: Run integration tests
+        working-directory: stock-app
+        env:
+          APP_URL: http://localhost:8001
+        run: pytest tests/integration/ -v
+
+  promote-prod:
+    name: Promote → prod
+    needs: integration-test
+    if: github.ref == 'refs/heads/main'
+    runs-on: [self-hosted, Linux, X64]
+    environment: prod
+
+    steps:
+      - name: Promote image
+        run: docker tag stock-app:dev stock-app:prod
+
+      - name: Deploy prod container
+        run: |
+          docker rm -f stock-app-prod 2>/dev/null || true
+          docker run -d \
+            --name stock-app-prod \
+            --restart unless-stopped \
+            -p 8000:8000 \
+            -e CASSANDRA_HOSTS=100.64.213.62 \
+            --network homelab-net \
+            stock-app:prod
+
+      - name: Smoke test prod
+        run: |
+          for i in $(seq 1 15); do
+            curl -sf http://localhost:8000/health && exit 0
+            sleep 3
+          done
+          echo "Prod deployment did not become healthy" && exit 1
+
+      - name: Notify Slack
+        run: |
+          curl -s -X POST -H 'Content-type: application/json' \
+            --data '{
+              "attachments": [{
+                "color": "good",
+                "text": "stock-app promoted to prod from ${{ github.ref_name }} (commit ${{ github.sha }})."
+              }]
+            }' \
+            "${{ secrets.SLACK_WEBHOOK_URL }}"
