@@ -64,6 +64,14 @@ jobs:
           docker volume ls --filter "name=^cassandra-data-" --quiet | xargs -r docker volume rm
           echo "Cleaned up conflicting Cassandra containers, network, and volumes"
 
+      - name: Clean up Portainer Docker conflicts
+        if: inputs.action == 'apply' && inputs.module == 'Portainer'
+        env:
+          DOCKER_HOST: ${{ env.TF_VAR_docker_host }}
+        run: |
+          docker rm -f portainer 2>/dev/null || true
+          echo "Cleaned up conflicting Portainer container"
+
       - name: Clean up Docker resources (if needed)
         if: inputs.action == 'apply' && inputs.module == 'Docker'
         env:
