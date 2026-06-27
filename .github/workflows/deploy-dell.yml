@@ -5,7 +5,7 @@ on:
   push:
     branches: [main]
     paths:
-      - 'dell/**'
+      - 'dell/services/portainer/**'
 
 jobs:
   deploy:
@@ -22,25 +22,13 @@ jobs:
           chmod 600 ~/.ssh/deploy_key
           ssh-keyscan 100.64.213.62 >> ~/.ssh/known_hosts
 
-      - name: Copy changed service compose files to /data/services
+      - name: Rsync portainer compose to /data/services/portainer
         run: |
-          for service in proxy monitoring ci registry portainer; do
-            src="dell/services/${service}"
-            dst="/data/services/${service}"
-            if [ -d "${src}" ]; then
-              mkdir -p "${dst}"
-              cp -r "${src}/." "${dst}/"
-            fi
-          done
+          mkdir -p /data/services/portainer
+          rsync -az dell/services/portainer/ /data/services/portainer/
 
-      - name: Bring up affected services
-        run: |
-          for service in proxy monitoring ci registry portainer; do
-            compose="/data/services/${service}/compose.yml"
-            if [ -f "${compose}" ]; then
-              docker compose -f "${compose}" up -d
-            fi
-          done
+      - name: Deploy portainer
+        run: docker compose -f /data/services/portainer/compose.yml up -d
 
       - name: Verify containers are healthy
         run: |
