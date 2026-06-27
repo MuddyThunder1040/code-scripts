@@ -19,17 +19,12 @@ jobs:
         with:
           python-version: '3.12'
 
-      - name: Install dependencies
+      - name: Install dependencies + lint + unit tests
         working-directory: stock-app
-        run: pip install -r requirements.txt ruff
-
-      - name: Lint
-        working-directory: stock-app
-        run: ruff check app/
-
-      - name: Unit tests
-        working-directory: stock-app
-        run: pytest tests/unit/ -v
+        run: |
+          pip install -r requirements.txt ruff
+          ruff check app/
+          pytest tests/unit/ -v
 
   deploy-dev:
     name: Deploy → dev

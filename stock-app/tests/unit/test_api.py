@@ -4,6 +4,9 @@ from decimal import Decimal
 from unittest.mock import MagicMock, patch
 from fastapi.testclient import TestClient
 
+import importlib
+import app.main as main_module
+
 
 @pytest.fixture
 def mock_session():
@@ -14,10 +17,9 @@ def mock_session():
 
 @pytest.fixture
 def client(mock_session):
-    with patch("app.db.get_session", return_value=mock_session), \
-         patch("app.db._bootstrap"):
-        from app.main import app
-        with TestClient(app, raise_server_exceptions=True) as c:
+    # patch where the name is used (app.main), not where it's defined
+    with patch.object(main_module, "get_session", return_value=mock_session):
+        with TestClient(main_module.app, raise_server_exceptions=True) as c:
             yield c, mock_session
 
 
@@ -38,7 +40,7 @@ def test_ingest_success(client):
         "Volume": [1000000],
     }, index=pd.to_datetime(["2024-01-01"], utc=True))
 
-    with patch("app.main.yf.Ticker") as mock_ticker:
+    with patch.object(main_module.yf, "Ticker") as mock_ticker:
         mock_ticker.return_value.history.return_value = mock_df
         r = c.post("/ingest/AAPL")
 
@@ -50,7 +52,7 @@ def test_ingest_success(client):
 
 def test_ingest_unknown_ticker(client):
     c, _ = client
-    with patch("app.main.yf.Ticker") as mock_ticker:
+    with patch.object(main_module.yf, "Ticker") as mock_ticker:
         mock_ticker.return_value.history.return_value = pd.DataFrame()
         r = c.post("/ingest/NOTREAL")
     assert r.status_code == 404
@@ -65,10 +67,11 @@ def test_get_prices_not_found(client):
 
 def test_get_prices_returns_data(client):
     c, session = client
+    import datetime
     row = MagicMock()
     row.ticker = "AAPL"
-    row.date = __import__("datetime").date(2024, 1, 1)
-    row.ts = __import__("datetime").datetime(2024, 1, 1, 0, 0)
+    row.date = datetime.date(2024, 1, 1)
+    row.ts = datetime.datetime(2024, 1, 1, 0, 0)
     row.open = Decimal("150.00")
     row.high = Decimal("155.00")
     row.low  = Decimal("149.00")
