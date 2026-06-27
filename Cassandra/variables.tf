@@ -1,3 +1,9 @@
+variable "docker_host" {
+  description = "Docker daemon host. Use tcp://100.64.213.62:2375 for Desktop WSL2 over Tailscale."
+  type        = string
+  default     = "tcp://100.64.213.62:2375"
+}
+
 variable "cassandra_image" {
   description = "Docker image used for all Cassandra containers."
   type        = string

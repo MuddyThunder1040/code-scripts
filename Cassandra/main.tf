@@ -20,7 +20,9 @@ terraform {
   }
 }
 
-provider "docker" {}
+provider "docker" {
+  host = var.docker_host
+}
 provider "time" {}
 
 locals {
