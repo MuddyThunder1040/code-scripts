@@ -27,6 +27,9 @@ jobs:
           mkdir -p /data/services/portainer
           rsync -az dell/services/portainer/ /data/services/portainer/
 
+      - name: Ensure homelab-net network exists
+        run: docker network inspect homelab-net >/dev/null 2>&1 || docker network create homelab-net
+
       - name: Deploy portainer
         run: docker compose -f /data/services/portainer/compose.yml up -d
 
