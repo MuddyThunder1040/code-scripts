@@ -54,6 +54,7 @@ jobs:
 
       - name: Deploy dev container
         run: |
+          docker ps -q --filter "publish=8001" | xargs -r docker rm -f
           docker rm -f crypto-monitor-dev 2>/dev/null || true
           docker run -d \
             --name crypto-monitor-dev \
@@ -110,6 +111,7 @@ jobs:
 
       - name: Deploy prod container
         run: |
+          docker ps -q --filter "publish=8000" | xargs -r docker rm -f
           docker rm -f crypto-monitor-prod 2>/dev/null || true
           docker run -d \
             --name crypto-monitor-prod \
