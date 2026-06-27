@@ -56,6 +56,8 @@ jobs:
 
       - name: Clean up Cassandra Docker conflicts
         if: inputs.action == 'apply' && inputs.module == 'Cassandra'
+        env:
+          DOCKER_HOST: ${{ env.TF_VAR_docker_host }}
         run: |
           docker ps -a --filter "name=cassandra" --quiet | xargs -r docker rm -f
           docker network ls --filter "name=^cassandra-network$" --quiet | xargs -r docker network rm
@@ -64,6 +66,8 @@ jobs:
 
       - name: Clean up Docker resources (if needed)
         if: inputs.action == 'apply' && inputs.module == 'Docker'
+        env:
+          DOCKER_HOST: ${{ env.TF_VAR_docker_host }}
         run: |
           docker ps -a --filter "name=cassandra" --quiet | xargs -r docker rm -f
           docker network ls --filter "name=cassandra-network" --quiet | xargs -r docker network rm
@@ -83,6 +87,8 @@ jobs:
       - name: Verify Cassandra cluster
         if: inputs.action == 'apply' && inputs.module == 'Cassandra'
         working-directory: ${{ inputs.module }}
+        env:
+          DOCKER_HOST: ${{ env.TF_VAR_docker_host }}
         run: |
           node_count=$(terraform output -no-color node_container_names | grep -c '"cassandra-node-')
           expected_nodes=$((1 + node_count))
