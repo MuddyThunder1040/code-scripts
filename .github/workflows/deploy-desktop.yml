@@ -15,23 +15,27 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      - name: Setup SSH key
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.HOMELAB_DEPLOY_KEY }}" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan 100.64.213.62 >> ~/.ssh/known_hosts
+
       - name: Copy compose files to Desktop WSL2 and bring up services
         env:
           DESKTOP_IP: 100.64.213.62
           DESKTOP_USER: vishnu
         run: |
-          eval "$(ssh-agent -s)"
-          echo "${{ secrets.DESKTOP_SSH_KEY }}" | ssh-add -
-
-          SSH="ssh -o StrictHostKeyChecking=no ${DESKTOP_USER}@${DESKTOP_IP}"
-          SCP="scp -o StrictHostKeyChecking=no"
+          SSH="ssh -i $HOME/.ssh/deploy_key -o StrictHostKeyChecking=no ${DESKTOP_USER}@${DESKTOP_IP}"
 
           for service in cassandra databases kafka ai storage; do
             src="desktop/services/${service}/compose.yml"
             dst_dir="~/homelab/docker/${service}"
             if [ -f "${src}" ]; then
               ${SSH} "mkdir -p ${dst_dir}"
-              ${SCP} "${src}" "${DESKTOP_USER}@${DESKTOP_IP}:${dst_dir}/compose.yml"
+              rsync -az -e "ssh -i $HOME/.ssh/deploy_key -o StrictHostKeyChecking=no" \
+                "${src}" "${DESKTOP_USER}@${DESKTOP_IP}:${dst_dir}/compose.yml"
               ${SSH} "docker compose -f ${dst_dir}/compose.yml up -d"
             fi
           done
@@ -41,10 +45,8 @@ jobs:
           DESKTOP_IP: 100.64.213.62
           DESKTOP_USER: vishnu
         run: |
-          eval "$(ssh-agent -s)"
-          echo "${{ secrets.DESKTOP_SSH_KEY }}" | ssh-add -
-
-          unhealthy=$(ssh -o StrictHostKeyChecking=no ${DESKTOP_USER}@${DESKTOP_IP} \
+          unhealthy=$(ssh -i $HOME/.ssh/deploy_key -o StrictHostKeyChecking=no \
+            ${DESKTOP_USER}@${DESKTOP_IP} \
             "docker ps --filter 'health=unhealthy' --format '{{.Names}}'")
           if [ -n "${unhealthy}" ]; then
             echo "Unhealthy containers: ${unhealthy}"
