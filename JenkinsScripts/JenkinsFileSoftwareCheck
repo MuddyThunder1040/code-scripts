@@ -1,6 +1,7 @@
 pipeline {
-    agent {macmini}
-
+    agent {
+        label 'macmini'
+    }
 
     options {
         timestamps()
